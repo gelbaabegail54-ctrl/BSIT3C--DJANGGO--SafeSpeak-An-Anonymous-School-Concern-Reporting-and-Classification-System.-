@@ -20,10 +20,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Core URLs are included first so custom /admin/... pages are not
+    # shadowed by the Django admin site (which would otherwise 404 them).
     path('', include('apps.core.urls')),
+    path('admin/', admin.site.urls),
     path('users/', include('apps.users.urls')),
-    path('info/', include('apps.info.urls')),
 ]
 
 if settings.DEBUG:

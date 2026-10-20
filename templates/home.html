@@ -1,26 +1,325 @@
 {% extends "theme/base.html" %}
 {% block content %}
-<div class="container-xl">
-  <div class="page-header d-print-none" aria-label="Page header">
-    <div class="container-xl">
-      <div class="row align-items-center">
-        <div class="col">
-          <div class="page-pretitle">Overview</div>
-          <div class="d-flex align-items-center gap-3 flex-wrap d-none d-md-flex">
-            <h2 class="page-title mb-0">Dashboard</h2>
+<div class="row g-3 pt-2">
+  <!-- Timeline -->
+  <div class="col-lg-8">
+    <div class="card dh-feed-header mb-3">
+      <div class="card-body py-3">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div>
+            <h2 class="h3 mb-0">Home</h2>
+            <div class="text-secondary small">Anonymous reports from the SafeSpeak community</div>
           </div>
-          <h2 class="page-title mb-0 d-md-none">Dashboard</h2>
+        </div>
+        <div class="dh-feed-tabs mt-3" role="tablist" aria-label="Feed filters">
+          <button type="button" class="dh-feed-tab active" data-feed-filter="all" aria-pressed="true">
+            <i class="fas fa-layer-group me-1"></i>Latest
+          </button>
+          <button type="button" class="dh-feed-tab" data-feed-filter="concern" aria-pressed="false">
+            <i class="fas fa-triangle-exclamation me-1"></i>Concerns
+          </button>
+          <button type="button" class="dh-feed-tab" data-feed-filter="confession" aria-pressed="false">
+            <i class="fas fa-comment-dots me-1"></i>Confessions
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card dh-compose mb-3">
+      <div class="card-body">
+        <div class="d-flex gap-3">
+          <span class="dh-feed-avatar dh-feed-avatar-user">{{ user.username|default:"A"|first|upper }}</span>
+          <div class="flex-grow-1">
+            <a class="dh-compose-input" href="{% url 'submit_concern' %}">
+              What would you like to report?
+            </a>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+              <div class="dh-compose-actions">
+                <a href="{% url 'submit_concern' %}" class="dh-compose-action">
+                  <i class="fas fa-triangle-exclamation" style="color:#e8590c;"></i>Concern
+                </a>
+                <a href="{% url 'submit_confession' %}" class="dh-compose-action">
+                  <i class="fas fa-comment-dots" style="color:#c2255c;"></i>Confession
+                </a>
+              </div>
+              <a href="{% url 'submit_concern' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                Post anonymously
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% include 'theme/messages.html' %}
+
+    <div class="card dh-feed-card">
+      {% for item in feed %}
+      <article class="dh-feed-item" data-feed-kind="{{ item.kind }}" id="report-{{ item.kind }}-{{ item.report.pk }}">
+        <div class="d-flex gap-3">
+          <span class="dh-feed-avatar {% if item.kind == 'concern' %}dh-feed-avatar-concern{% else %}dh-feed-avatar-confession{% endif %}">
+            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}"></i>
+          </span>
+          <div class="dh-feed-body flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <span class="fw-bold">Anonymous</span>
+              <span class="text-secondary small">{{ item.report.submitted_at|timesince }} ago</span>
+              <span class="badge bg-secondary-lt text-secondary">{{ item.label }}</span>
+              {% if item.report.category %}
+              <span class="badge bg-primary-lt text-primary">{{ item.report.category.name }}</span>
+              {% endif %}
+              {% if item.report.is_urgent %}
+              <span class="badge bg-danger-lt text-danger"><i class="fas fa-bolt me-1"></i>Urgent</span>
+              {% endif %}
+            </div>
+            <p class="dh-feed-text mb-2">{{ item.report.description|truncatechars:280 }}</p>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <span class="badge {% if item.report.status == 'RESOLVED' %}bg-success-lt text-success{% elif item.report.status == 'DISMISSED' %}bg-danger-lt text-danger{% elif item.report.status == 'IN_PROGRESS' %}bg-info-lt text-info{% elif item.report.status == 'UNDER_REVIEW' %}bg-warning-lt text-warning{% else %}bg-primary-lt text-primary{% endif %}">
+                {{ item.report.get_status_display }}
+              </span>
+              <div class="d-flex align-items-center gap-1">
+                <button type="button" class="dh-post-action" data-bs-toggle="collapse" data-bs-target="#comments-{{ item.kind }}-{{ item.report.pk }}" aria-expanded="false" aria-controls="comments-{{ item.kind }}-{{ item.report.pk }}">
+                  <i class="fas fa-comment"></i>
+                  <span>{{ item.comment_count }} Comment{{ item.comment_count|pluralize }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="collapse dh-comment-section" id="comments-{{ item.kind }}-{{ item.report.pk }}">
+              {% if item.comments %}
+              <div class="dh-comment-list">
+                {% for comment in item.comments %}
+                <div class="dh-comment">
+                  <span class="dh-feed-avatar dh-feed-avatar-anon">A</span>
+                  <div class="dh-comment-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                      <span class="fw-semibold">Anonymous</span>
+                      <span class="text-secondary small">
+                        {{ comment.created_at|timesince }} ago{% if comment.is_edited %} &middot; edited{% endif %}
+                      </span>
+                      {% if comment.author_id == user.id or user.is_superuser %}
+                      <div class="dh-comment-actions ms-auto">
+                        <button type="button" class="dh-comment-action" data-bs-toggle="collapse" data-bs-target="#edit-comment-{{ comment.pk }}" aria-expanded="false" aria-controls="edit-comment-{{ comment.pk }}">
+                          <i class="fas fa-pen me-1"></i>Edit
+                        </button>
+                        <form method="post" action="{% url 'delete_comment' comment.pk %}" class="d-inline" onsubmit="return confirm('Delete this comment?');">
+                          {% csrf_token %}
+                          <button type="submit" class="dh-comment-action dh-comment-action-danger">
+                            <i class="fas fa-trash me-1"></i>Delete
+                          </button>
+                        </form>
+                      </div>
+                      {% endif %}
+                    </div>
+                    <div class="dh-comment-text">{{ comment.body|linebreaksbr }}</div>
+                    {% if comment.author_id == user.id or user.is_superuser %}
+                    <div class="collapse mt-2" id="edit-comment-{{ comment.pk }}">
+                      <form method="post" action="{% url 'edit_comment' comment.pk %}">
+                        {% csrf_token %}
+                        <textarea class="form-control" name="body" rows="2" maxlength="1000" aria-label="Edit comment" required>{{ comment.body }}</textarea>
+                        <div class="d-flex justify-content-end gap-2 mt-2">
+                          <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-toggle="collapse" data-bs-target="#edit-comment-{{ comment.pk }}">
+                            Cancel
+                          </button>
+                          <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">
+                            <i class="fas fa-check me-1"></i>Save
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="text-secondary small mb-2">No comments yet. Start the conversation.</div>
+              {% endif %}
+
+              <form method="post" action="{% url 'add_comment' item.kind item.report.pk %}" class="dh-comment-form">
+                {% csrf_token %}
+                <span class="dh-feed-avatar dh-feed-avatar-anon">A</span>
+                <div class="flex-grow-1">
+                  <textarea class="form-control" name="body" rows="2" maxlength="1000" placeholder="Write an anonymous comment..." aria-label="Write an anonymous comment" required></textarea>
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                    <span class="text-secondary small"><i class="fas fa-lock me-1"></i>Comments are anonymous.</span>
+                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">
+                      <i class="fas fa-paper-plane me-1"></i>Comment
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </article>
+      {% empty %}
+      <div class="dh-feed-empty text-center py-5">
+        <div class="d-flex justify-content-center mb-3">
+          <span class="dh-feed-avatar dh-feed-avatar-concern"><i class="fas fa-inbox"></i></span>
+        </div>
+        <h3 class="mb-1">No reports yet</h3>
+        <p class="text-secondary mb-3">Be the first to share a concern or confession.</p>
+        <a href="{% url 'submit_concern' %}" class="btn btn-primary rounded-pill px-3">Report a concern</a>
+      </div>
+      {% endfor %}
+      {% if feed %}
+      <div class="dh-feed-end text-center text-secondary small py-4">
+        <i class="fas fa-circle-check text-success me-1"></i>You're all caught up
+      </div>
+      {% endif %}
+      <div id="feed-filter-empty" class="dh-feed-empty text-center py-5 d-none">
+        <h3 class="mb-1">Nothing here yet</h3>
+        <p class="text-secondary mb-0">No reports match this filter.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="col-lg-4">
+    <div class="dh-feed-aside">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">SafeSpeak at a glance</h3>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 text-center">
+            <div class="col-6">
+              <div class="dh-mini-stat">
+                <div class="h3 mb-0">{{ total_reports }}</div>
+                <div class="text-secondary small">Total reports</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="dh-mini-stat">
+                <div class="h3 mb-0">{{ open_reports }}</div>
+                <div class="text-secondary small">Open</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="dh-mini-stat">
+                <div class="h3 mb-0">{{ resolved_reports }}</div>
+                <div class="text-secondary small">Resolved</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="dh-mini-stat">
+                <div class="h3 mb-0 text-danger">{{ urgent_reports }}</div>
+                <div class="text-secondary small">Urgent</div>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between text-secondary small mt-3">
+            <span>{{ total_concerns }} concern{{ total_concerns|pluralize }}</span>
+            <span>{{ total_confessions }} confession{{ total_confessions|pluralize }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">Reports by category</h3>
+        </div>
+        <div class="card-body">
+          {% for row in category_stats %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-baseline mb-1">
+              <span class="fw-semibold">{{ row.name }}</span>
+              <span class="text-secondary small">{{ row.total }}</span>
+            </div>
+            <div class="progress progress-sm">
+              <div class="progress-bar" role="progressbar" style="width: {{ row.percent }}%" aria-valuenow="{{ row.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-secondary small">No categories yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">Status overview</h3>
+        </div>
+        <div class="card-body">
+          {% for row in status_breakdown %}
+          <div class="d-flex align-items-center justify-content-between py-1">
+            <span class="d-flex align-items-center gap-2">
+              <span class="dh-status-dot {% if row.code == 'RESOLVED' %}bg-success{% elif row.code == 'DISMISSED' %}bg-danger{% elif row.code == 'IN_PROGRESS' %}bg-info{% elif row.code == 'UNDER_REVIEW' %}bg-warning{% else %}bg-primary{% endif %}"></span>
+              <span class="text-secondary">{{ row.label }}</span>
+            </span>
+            <span class="fw-semibold">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex gap-2">
+            <i class="fas fa-lock text-primary mt-1"></i>
+            <div>
+              <div class="fw-semibold">Your identity stays private</div>
+              <div class="text-secondary small">Reports are shown without names or accounts.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-  <br>
-
-  <div class="card">
-    <div class="card-body text-muted">
-      Dashboard
-    </div>
-  </div>
-
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabs = document.querySelectorAll("[data-feed-filter]");
+    const items = document.querySelectorAll(".dh-feed-item");
+    const emptyState = document.getElementById("feed-filter-empty");
+
+    function openLinkedComments() {
+      const hash = window.location.hash;
+      if (!hash || !hash.startsWith("#report-")) {
+        return;
+      }
+
+      const article = document.getElementById(hash.slice(1));
+      if (!article) {
+        return;
+      }
+
+      const section = article.querySelector(".dh-comment-section");
+      if (section && window.bootstrap) {
+        bootstrap.Collapse.getOrCreateInstance(section, { toggle: false }).show();
+      }
+      article.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    openLinkedComments();
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        const filter = tab.getAttribute("data-feed-filter");
+        let visible = 0;
+
+        tabs.forEach(function (other) {
+          other.classList.toggle("active", other === tab);
+          other.setAttribute("aria-pressed", other === tab ? "true" : "false");
+        });
+
+        items.forEach(function (item) {
+          const matches = filter === "all" || item.getAttribute("data-feed-kind") === filter;
+          item.style.display = matches ? "" : "none";
+          if (matches) {
+            visible += 1;
+          }
+        });
+
+        if (emptyState) {
+          emptyState.classList.toggle("d-none", visible !== 0 || items.length === 0);
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

@@ -1,0 +1,426 @@
+{% extends "theme/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'css/guardian.css' %}" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="gs-page">
+
+  <div class="gs-page-head">
+    <div>
+      <div class="gs-pretitle">Administration</div>
+      <h1 class="gs-title">Reports overview</h1>
+      <p class="gs-subtitle">Monitor, triage, and resolve anonymous submissions from the SafeSpeak community.</p>
+    </div>
+    <div class="gs-head-actions">
+      <span class="gs-date"><i class="far fa-calendar" aria-hidden="true"></i> {% now "D, M j, Y" %}</span>
+      <a href="{% url 'users:user_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-users me-1" aria-hidden="true"></i> Manage users
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}
+  <div class="mb-3">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+      <i class="fas {% if message.tags == 'success' %}fa-circle-check{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} alert-icon" aria-hidden="true"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="gs-kpi-grid">
+    <article class="gs-kpi">
+      <div class="gs-kpi-top">
+        <span class="gs-kpi-icon is-primary"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
+        <span class="gs-kpi-chip {% if new_this_week %}is-positive{% endif %}">
+          {% if new_this_week %}<i class="fas fa-arrow-trend-up" aria-hidden="true"></i>{% endif %}
+          {{ new_this_week }} new this week
+        </span>
+      </div>
+      <div class="gs-kpi-value">{{ total_reports }}</div>
+      <div class="gs-kpi-label">Total reports</div>
+      <div class="gs-kpi-meta">
+        {{ total_concerns }} concern{{ total_concerns|pluralize }} &middot;
+        {{ total_confessions }} confession{{ total_confessions|pluralize }}
+      </div>
+    </article>
+
+    <article class="gs-kpi">
+      <div class="gs-kpi-top">
+        <span class="gs-kpi-icon is-warning"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+        <span class="gs-kpi-chip">{% if open_reports %}Needs review{% else %}Queue clear{% endif %}</span>
+      </div>
+      <div class="gs-kpi-value">{{ open_reports }}</div>
+      <div class="gs-kpi-label">Open cases</div>
+      <div class="gs-kpi-meta">Awaiting review or resolution</div>
+    </article>
+
+    <article class="gs-kpi">
+      <div class="gs-kpi-top">
+        <span class="gs-kpi-icon is-success"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
+        <span class="gs-kpi-chip {% if resolution_rate >= 50 %}is-positive{% endif %}">{{ resolution_rate }}% resolution</span>
+      </div>
+      <div class="gs-kpi-value">{{ resolved_reports }}</div>
+      <div class="gs-kpi-label">Resolved</div>
+      <div class="gs-kpi-meta">Reports closed with a resolution</div>
+    </article>
+
+    <article class="gs-kpi">
+      <div class="gs-kpi-top">
+        <span class="gs-kpi-icon is-danger"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
+        <span class="gs-kpi-chip {% if urgent_reports %}is-alert{% else %}is-positive{% endif %}">
+          {% if urgent_reports %}Action needed{% else %}All clear{% endif %}
+        </span>
+      </div>
+      <div class="gs-kpi-value">{{ urgent_reports }}</div>
+      <div class="gs-kpi-label">Urgent open</div>
+      <div class="gs-kpi-meta">Flagged reports still open</div>
+    </article>
+  </div>
+
+  <div class="row g-3 mb-1">
+    <div class="col-lg-8">
+      <section class="card gs-card gs-chart-card h-100" aria-labelledby="gs-volume-title">
+        <div class="card-header">
+          <div>
+            <h2 class="gs-card-title" id="gs-volume-title">Report volume</h2>
+            <p class="gs-card-sub">Submission activity across the last 7 days</p>
+          </div>
+          <div class="gs-legend" aria-hidden="true">
+            <span><span class="gs-dot" style="background: var(--tblr-primary);"></span>Concerns</span>
+            <span><span class="gs-dot" style="background: var(--tblr-muted);"></span>Confessions</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="gs-volume-chart" class="gs-chart"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-lg-4">
+      <section class="card gs-card h-100" aria-labelledby="gs-status-title">
+        <div class="card-header">
+          <div>
+            <h2 class="gs-card-title" id="gs-status-title">Case status</h2>
+            <p class="gs-card-sub">All reports by workflow stage</p>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if total_reports %}
+          <div class="gs-donut-wrap">
+            <div id="gs-status-chart" class="gs-donut"></div>
+            <div class="gs-donut-center" aria-hidden="true">
+              <strong>{{ total_reports }}</strong>
+              <span>Reports</span>
+            </div>
+          </div>
+          {% else %}
+          <div class="gs-empty py-4">
+            <h3 class="gs-empty-title">No reports yet</h3>
+            <p class="gs-empty-text">Status totals will appear here.</p>
+          </div>
+          {% endif %}
+
+          {% if total_reports %}
+          <div class="gs-status-legend">
+            {% for item in status_breakdown %}
+            <div class="gs-legend-row">
+              <span><span class="gs-dot" style="background: {{ item.color }};"></span>{{ item.label }}</span>
+              <strong>{{ item.total }}</strong>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card gs-card gs-filter-card mt-3" aria-label="Filter reports">
+    <div class="card-body">
+      <form method="get" class="gs-filter" role="search">
+        <div class="gs-search">
+          <label class="form-label" for="gs-search-input">Search</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search" aria-hidden="true"></i></span>
+            <input type="search" id="gs-search-input" name="q" value="{{ query }}" class="form-control" placeholder="Ticket number, title, or description">
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label" for="gs-status-filter">Status</label>
+          <select name="status" id="gs-status-filter" class="form-select">
+            <option value="">All statuses</option>
+            {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="gs-category-filter">Category</label>
+          <select name="category" id="gs-category-filter" class="form-select">
+            <option value="">All categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="gs-filter-actions">
+          <button type="submit" class="btn btn-primary"><i class="fas fa-sliders me-1" aria-hidden="true"></i> Apply</button>
+          <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary" title="Reset filters" aria-label="Reset filters">
+            <i class="fas fa-rotate-left" aria-hidden="true"></i>
+          </a>
+        </div>
+      </form>
+
+      {% if query or current_status or current_category %}
+      <div class="gs-filter-summary">
+        <i class="fas fa-filter" aria-hidden="true"></i>
+        <span>Filtered by</span>
+        {% if query %}
+        <span>Search: <strong>&ldquo;{{ query }}&rdquo;</strong></span>
+        {% endif %}
+        {% if current_status %}
+        <span>Status:
+          <strong>
+            {% for code, label in status_choices %}{% if code == current_status %}{{ label }}{% endif %}{% endfor %}
+          </strong>
+        </span>
+        {% endif %}
+        {% if current_category %}
+        <span>Category:
+          <strong>
+            {% for cat in categories %}{% if current_category == cat.id|stringformat:"s" %}{{ cat.name }}{% endif %}{% endfor %}
+          </strong>
+        </span>
+        {% endif %}
+        <a href="{% url 'admin_dashboard' %}">Clear all</a>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card gs-card gs-table-card" id="reports" aria-label="Report queue">
+    <div class="card-header">
+      <div class="gs-table-tabs" role="tablist" aria-label="Report type">
+        <button class="gs-tab active" id="gs-concerns-tab" data-bs-toggle="tab" data-bs-target="#gs-concerns" type="button" role="tab" aria-controls="gs-concerns" aria-selected="true">
+          Concerns <span class="gs-count">{{ concerns|length }}</span>
+        </button>
+        <button class="gs-tab" id="gs-confessions-tab" data-bs-toggle="tab" data-bs-target="#gs-confessions" type="button" role="tab" aria-controls="gs-confessions" aria-selected="false">
+          Confessions <span class="gs-count">{{ confessions|length }}</span>
+        </button>
+      </div>
+      <div class="gs-result-count">{{ filtered_total }} result{{ filtered_total|pluralize }}</div>
+    </div>
+
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="gs-concerns" role="tabpanel" aria-labelledby="gs-concerns-tab">
+        {% include "theme/admin_report_table.html" with reports=concerns kind="concern" type_label="Concern" %}
+      </div>
+      <div class="tab-pane fade" id="gs-confessions" role="tabpanel" aria-labelledby="gs-confessions-tab">
+        {% include "theme/admin_report_table.html" with reports=confessions kind="confession" type_label="Confession" %}
+      </div>
+    </div>
+  </section>
+
+  {{ weekly_labels|json_script:"gs-weekly-labels" }}
+  {{ weekly_concerns|json_script:"gs-weekly-concerns" }}
+  {{ weekly_confessions|json_script:"gs-weekly-confessions" }}
+  {{ status_breakdown|json_script:"gs-status-breakdown" }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+
+  var started = false;
+
+  function readJSON(id) {
+    var node = document.getElementById(id);
+    if (!node) return null;
+    try {
+      return JSON.parse(node.textContent);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function palette() {
+    var styles = getComputedStyle(document.documentElement);
+    var rootTheme = document.documentElement.getAttribute("data-bs-theme");
+    var bodyTheme = document.body ? document.body.getAttribute("data-bs-theme") : null;
+    return {
+      primary: styles.getPropertyValue("--tblr-primary").trim() || "#4f46e5",
+      muted: styles.getPropertyValue("--tblr-muted").trim() || "#6e7591",
+      border: styles.getPropertyValue("--tblr-border-color").trim() || "#e6e8f2",
+      surface: styles.getPropertyValue("--tblr-bg-surface").trim() || "#ffffff",
+      dark: (rootTheme || bodyTheme) === "dark"
+    };
+  }
+
+  function initDashboardCharts() {
+    if (started || !window.ApexCharts) return;
+
+    var volumeElement = document.getElementById("gs-volume-chart");
+    var statusElement = document.getElementById("gs-status-chart");
+    if (!volumeElement) return;
+
+    var labels = readJSON("gs-weekly-labels") || [];
+    var concerns = readJSON("gs-weekly-concerns") || [];
+    var confessions = readJSON("gs-weekly-confessions") || [];
+    var breakdown = (readJSON("gs-status-breakdown") || []).filter(function (item) {
+      return item.total > 0;
+    });
+
+    started = true;
+    var colors = palette();
+
+    var volumeChart = new ApexCharts(volumeElement, {
+      chart: {
+        type: "area",
+        height: 372,
+        fontFamily: "inherit",
+        toolbar: { show: false },
+        animations: { enabled: false },
+        parentHeightOffset: 0,
+        background: "transparent"
+      },
+      series: [
+        { name: "Concerns", data: concerns },
+        { name: "Confessions", data: confessions }
+      ],
+      colors: [colors.primary, colors.muted],
+      dataLabels: { enabled: false },
+      stroke: { curve: "smooth", width: 2.5, lineCap: "round" },
+      fill: {
+        type: "gradient",
+        gradient: { shadeIntensity: 1, opacityFrom: 0.22, opacityTo: 0.01, stops: [0, 92] }
+      },
+      grid: {
+        borderColor: colors.border,
+        strokeDashArray: 4,
+        padding: { top: 6, right: 10, left: 2, bottom: 0 }
+      },
+      xaxis: {
+        categories: labels,
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        labels: { style: { colors: colors.muted, fontSize: "11px" }, rotate: 0, hideOverlappingLabels: false }
+      },
+      yaxis: {
+        min: 0,
+        forceNiceScale: true,
+        tickAmount: 4,
+        labels: {
+          style: { colors: colors.muted, fontSize: "11px" },
+          formatter: function (value) { return Math.round(value); }
+        }
+      },
+      legend: { show: false },
+      markers: { size: 0, hover: { size: 5 } },
+      tooltip: {
+        theme: colors.dark ? "dark" : "light",
+        y: {
+          formatter: function (value) {
+            return value + (value === 1 ? " report" : " reports");
+          }
+        }
+      },
+      noData: {
+        text: "No reports in the last 7 days",
+        align: "center",
+        verticalAlign: "middle",
+        style: { color: colors.muted, fontSize: "12px" }
+      }
+    });
+    volumeChart.render();
+
+    var statusChart = null;
+    if (statusElement && breakdown.length) {
+      statusChart = new ApexCharts(statusElement, {
+        chart: {
+          type: "donut",
+          height: 196,
+          fontFamily: "inherit",
+          animations: { enabled: false },
+          background: "transparent"
+        },
+        series: breakdown.map(function (item) { return item.total; }),
+        labels: breakdown.map(function (item) { return item.label; }),
+        colors: breakdown.map(function (item) { return item.color; }),
+        stroke: { width: 2, colors: [colors.surface] },
+        dataLabels: { enabled: false },
+        legend: { show: false },
+        plotOptions: {
+          pie: {
+            expandOnClick: false,
+            donut: {
+              size: "74%",
+              labels: { show: false }
+            }
+          }
+        },
+        tooltip: {
+          theme: colors.dark ? "dark" : "light",
+          y: {
+            formatter: function (value) {
+              return value + (value === 1 ? " report" : " reports");
+            }
+          }
+        }
+      });
+      statusChart.render();
+    }
+
+    if (!window.MutationObserver) return;
+
+    var observer = new MutationObserver(function () {
+      var next = palette();
+      volumeChart.updateOptions({
+        colors: [next.primary, next.muted],
+        grid: { borderColor: next.border },
+        xaxis: { labels: { style: { colors: next.muted } } },
+        yaxis: { labels: { style: { colors: next.muted } } },
+        tooltip: { theme: next.dark ? "dark" : "light" }
+      }, false, false);
+
+      if (statusChart) {
+        statusChart.updateOptions({
+          stroke: { width: 2, colors: [next.surface] },
+          tooltip: { theme: next.dark ? "dark" : "light" }
+        }, false, false);
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-bs-theme", "data-bs-theme-primary"]
+    });
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-bs-theme", "data-bs-theme-primary"]
+      });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initDashboardCharts);
+    window.addEventListener("load", initDashboardCharts);
+  } else {
+    initDashboardCharts();
+    window.addEventListener("load", initDashboardCharts);
+  }
+})();
+</script>
+{% endblock %}

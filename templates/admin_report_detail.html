@@ -1,0 +1,225 @@
+{% extends "theme/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'css/guardian.css' %}" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="gs-page">
+
+  <div class="gs-page-head">
+    <div>
+      <div class="gs-pretitle">
+        <a href="{% url 'admin_dashboard' %}" class="text-decoration-none" style="color: inherit;">
+          <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Back to reports
+        </a>
+      </div>
+      <h1 class="gs-title">{{ kind_label }} details</h1>
+      <p class="gs-subtitle">{{ report.title }}</p>
+    </div>
+    <div class="gs-head-actions d-print-none">
+      {% if report.is_urgent %}
+      <span class="gs-priority gs-priority--urgent"><i class="fas fa-bolt" aria-hidden="true"></i> Urgent</span>
+      {% endif %}
+      <span class="gs-status {% if report.status == 'RESOLVED' %}gs-status--resolved{% elif report.status == 'DISMISSED' %}gs-status--dismissed{% elif report.status == 'IN_PROGRESS' %}gs-status--progress{% elif report.status == 'UNDER_REVIEW' %}gs-status--review{% else %}gs-status--submitted{% endif %}">
+        <span class="gs-status-dot" aria-hidden="true"></span>
+        {{ report.get_status_display }}
+      </span>
+    </div>
+  </div>
+
+  {% if messages %}
+  <div class="mb-3">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+      <i class="fas {% if message.tags == 'success' %}fa-circle-check{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} alert-icon" aria-hidden="true"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+        <div class="row">
+          <div class="col-lg-8">
+            <div class="card mb-3">
+              <div class="card-header">
+                <h3 class="card-title">Report summary</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-secondary mb-4" style="white-space: pre-line;">{{ report.description }}</p>
+
+                <div class="datagrid">
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Ticket Number</div>
+                    <div class="datagrid-content"><code>{{ report.ticket_number }}</code></div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Category</div>
+                    <div class="datagrid-content">{{ report.category.name }}</div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Submitted</div>
+                    <div class="datagrid-content">{{ report.submitted_at|date:"M d, Y H:i" }}</div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Submitted By</div>
+                    <div class="datagrid-content">
+                      {% if report.submitted_by %}
+                        {{ report.submitted_by.username }}
+                      {% else %}
+                        Anonymous
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Location on Campus</div>
+                    <div class="datagrid-content">{{ report.location_on_campus|default:"Not provided" }}</div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Date of Incident</div>
+                    <div class="datagrid-content">{{ report.date_of_incident|default:"Not provided" }}</div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Last Updated</div>
+                    <div class="datagrid-content">{{ report.updated_at|date:"M d, Y H:i" }}</div>
+                  </div>
+                  <div class="datagrid-item">
+                    <div class="datagrid-title">Resolved At</div>
+                    <div class="datagrid-content">{{ report.resolved_at|date:"M d, Y H:i"|default:"—" }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-reply me-2"></i>Staff Response</h3>
+                {% if response %}
+                <div class="card-actions text-secondary">
+                  Last updated {{ response.created_at|date:"M d, Y H:i" }}{% if response.responded_by %} by {{ response.responded_by.username }}{% endif %}
+                </div>
+                {% endif %}
+              </div>
+              <div class="card-body">
+                {% if response %}
+                <div class="alert alert-info">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div style="white-space: pre-line;">{{ response.message }}</div>
+                    <span class="badge {% if response.is_public %}bg-success{% else %}bg-secondary{% endif %} ms-3">
+                      {% if response.is_public %}Public{% else %}Private{% endif %}
+                    </span>
+                  </div>
+                </div>
+                {% endif %}
+
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="response">
+                  <div class="mb-3">
+                    <label class="form-label">{% if response %}Update response{% else %}Write a response{% endif %}</label>
+                    <textarea name="message" class="form-control" rows="4" required placeholder="Respond to the reporter...">{% if response %}{{ response.message }}{% endif %}</textarea>
+                  </div>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="is_public" id="is_public" {% if response.is_public %}checked{% endif %}>
+                    <label class="form-check-label" for="is_public">
+                      Make this response visible to the reporter on the public status page
+                    </label>
+                  </div>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane me-1"></i> {% if response %}Update Response{% else %}Save Response{% endif %}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {% if kind == 'concern' %}
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-note-sticky me-2"></i>Internal Notes</h3>
+                <div class="card-actions text-secondary">Visible to staff only</div>
+              </div>
+              <div class="card-body">
+                {% for note in notes %}
+                <div class="border rounded p-3 mb-2">
+                  <div class="text-secondary small mb-1">
+                    {% if note.author %}{{ note.author.username }}{% else %}Staff{% endif %} &middot; {{ note.created_at|date:"M d, Y H:i" }}
+                  </div>
+                  <div style="white-space: pre-line;">{{ note.body }}</div>
+                </div>
+                {% empty %}
+                <div class="text-secondary mb-3">No internal notes yet.</div>
+                {% endfor %}
+
+                <form method="post" class="mt-3">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="note">
+                  <div class="mb-2">
+                    <label class="form-label">Add a note</label>
+                    <textarea name="body" class="form-control" rows="3" required placeholder="Internal note about this concern..."></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-outline-primary">
+                    <i class="fas fa-plus me-1"></i> Add Note
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card mb-3">
+              <div class="card-header">
+                <h3 class="card-title">Update Status</h3>
+              </div>
+              <div class="card-body">
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="status">
+                  <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                      {% for code, label in status_choices %}
+                      <option value="{{ code }}" {% if report.status == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-check me-1"></i> Update Status
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header">
+                <h3 class="card-title">Report Type</h3>
+              </div>
+              <div class="card-body">
+                <div class="d-flex align-items-center">
+                  <span class="avatar bg-{% if kind == 'concern' %}warning{% else %}purple{% endif %} text-white me-3">
+                    <i class="fas {% if kind == 'concern' %}fa-exclamation-triangle{% else %}fa-comment-dots{% endif %}"></i>
+                  </span>
+                  <div>
+                    <div class="fw-bold">{{ kind_label }}</div>
+                    <div class="text-secondary small">Submitted anonymously through SafeSpeak</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-body">
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary w-100 mb-2">
+                  <i class="fas fa-arrow-left me-1"></i> Back to Reports
+                </a>
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="window.print()">
+                  <i class="fas fa-print me-1"></i> Print Details
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+</div>
+{% endblock %}

@@ -1,16 +1,51 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.views.decorators.http import require_POST
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.db.models import Q
+from django.views.decorators.http import require_POST
+
+
+VALID_ROLES = {'instructor', 'staff', 'admin'}
 
 
 def _is_superuser(user):
     return user.is_superuser
+
+
+def _user_role(user):
+    if user.is_superuser:
+        return 'admin'
+    if user.is_staff:
+        return 'staff'
+    return 'instructor'
+
+
+def _other_active_admins(user):
+    return User.objects.filter(
+        is_superuser=True,
+        is_active=True,
+    ).exclude(pk=user.pk)
+
+
+def _serialize_user(user):
+    return {
+        'id': user.id,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email,
+        'is_staff': user.is_staff,
+        'is_superuser': user.is_superuser,
+        'is_active': user.is_active,
+        'role': _user_role(user),
+        'date_joined': user.date_joined,
+    }
 
 
 # PAGE
@@ -47,16 +82,7 @@ def user_list_ajax(request):
     paginator = Paginator(users_list, 10)
     page_number = request.GET.get('page', 1)
     users = paginator.get_page(page_number)
-    data = list(users.object_list.values(
-        'id',
-        'username',
-        'first_name',
-        'last_name',
-        'email',
-        'is_staff',
-        'is_active',
-        'date_joined',
-    ))
+    data = [_serialize_user(user) for user in users.object_list]
     return JsonResponse({
         "data":     data,
         "has_next": users.has_next(),
@@ -71,16 +97,12 @@ def user_list_ajax(request):
 @login_required(login_url='login')
 @user_passes_test(_is_superuser, login_url='dashboard')
 def user_get_ajax(request, pk):
-    user = get_object_or_404(User, pk=pk)
-    return JsonResponse({
-        "id":         user.id,
-        "username":   user.username,
-        "first_name": user.first_name,
-        "last_name":  user.last_name,
-        "email":      user.email,
-        "is_staff":   user.is_staff,
-        "is_active":  user.is_active,
-    })
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return JsonResponse({"error": "User not found."}, status=404)
+
+    return JsonResponse(_serialize_user(user))
 
 
 # CREATE / UPDATE USER (AJAX)
@@ -91,58 +113,97 @@ def user_save_ajax(request):
     user_id = request.POST.get("id")
 
     if user_id:
-        user = get_object_or_404(User, pk=user_id)
+        try:
+            user = User.objects.get(pk=user_id)
+        except (User.DoesNotExist, TypeError, ValueError):
+            return JsonResponse({"error": "User not found."}, status=404)
         is_update = True
     else:
         user = User()
         is_update = False
 
     username = request.POST.get("username", "").strip()
+    first_name = request.POST.get("first_name", "").strip()
+    last_name = request.POST.get("last_name", "").strip()
     email = request.POST.get("email", "").strip()
+    role = request.POST.get("role", "instructor").strip().lower()
+    is_active = request.POST.get("is_active") == "true"
 
     if not username:
         return JsonResponse({"error": "Username is required."}, status=400)
 
-    dup_qs = User.objects.filter(Q(username=username) | (Q(email=email) & ~Q(email="")))
-    if user_id:
-        dup_qs = dup_qs.exclude(pk=user_id)
-    if dup_qs.filter(username=username).exists():
+    if role not in VALID_ROLES:
+        return JsonResponse({"error": "Please choose a valid role."}, status=400)
+
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({"error": "Please enter a valid email address."}, status=400)
+
+    duplicate_users = User.objects.all()
+    if is_update:
+        duplicate_users = duplicate_users.exclude(pk=user.pk)
+
+    if duplicate_users.filter(username__iexact=username).exists():
         return JsonResponse({"error": "That username is already taken."}, status=400)
-    if email and dup_qs.filter(email=email).exists():
+
+    if email and duplicate_users.filter(email__iexact=email).exists():
         return JsonResponse({"error": "That email is already in use."}, status=400)
 
-    user.username   = username
-    user.first_name = request.POST.get("first_name", "")
-    user.last_name  = request.POST.get("last_name", "")
-    user.email      = email
-    user.is_staff   = request.POST.get("is_staff") == "true"
-    user.is_active  = request.POST.get("is_active") == "true"
+    if is_update:
+        if user.pk == request.user.pk and not is_active:
+            return JsonResponse(
+                {"error": "You cannot deactivate your own account."},
+                status=400,
+            )
+
+        if user.pk == request.user.pk and role != 'admin':
+            return JsonResponse(
+                {"error": "You cannot remove your own administrator access."},
+                status=400,
+            )
+
+        # Never allow the final active administrator to lose that access.
+        if user.is_superuser and user.is_active and (role != 'admin' or not is_active):
+            if not _other_active_admins(user).exists():
+                return JsonResponse(
+                    {"error": "At least one active administrator is required."},
+                    status=400,
+                )
 
     password = request.POST.get("password")
+    if not is_update and not password:
+        return JsonResponse({"error": "Password is required for new users."}, status=400)
+
     if password:
         user.set_password(password)
-    elif not user_id:
-        return JsonResponse({"error": "Password is required for new users."}, status=400)
+
+    user.username = username
+    user.first_name = first_name
+    user.last_name = last_name
+    user.email = email
+    user.is_active = is_active
+    user.is_superuser = role == 'admin'
+    user.is_staff = role in ('admin', 'staff')
 
     try:
         user.save()
     except IntegrityError:
-        return JsonResponse({"error": "Could not save user due to a conflict (duplicate username/email)."}, status=400)
+        return JsonResponse(
+            {"error": "Could not save user due to a conflict (duplicate username/email)."},
+            status=400,
+        )
 
     messages.success(
         request,
-        f'User "{user.username}" has been {"updated" if is_update else "saved"} successfully.'
+        f'User "{user.username}" has been '
+        f'{"updated" if is_update else "created"} successfully.'
     )
 
     return JsonResponse({
         "status": "success",
-        "id": user.id,
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "email": user.email,
-        "is_staff": user.is_staff,
-        "is_active": user.is_active,
+        **_serialize_user(user),
     })
 
 
@@ -151,9 +212,21 @@ def user_save_ajax(request):
 @user_passes_test(_is_superuser, login_url='dashboard')
 @require_POST
 def user_delete_ajax(request, pk):
-    user = get_object_or_404(User, pk=pk)
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return JsonResponse({"error": "User not found."}, status=404)
+
     if request.user == user:
-        return JsonResponse({"error": "You cannot delete yourself"}, status=400)
+        return JsonResponse({"error": "You cannot delete your own account."}, status=400)
+
+    # Keep a working administrator account at all times.
+    if user.is_superuser and user.is_active and not _other_active_admins(user).exists():
+        return JsonResponse(
+            {"error": "You cannot delete the last active administrator."},
+            status=400,
+        )
+
     username = user.username
     user.delete()
     return JsonResponse({
