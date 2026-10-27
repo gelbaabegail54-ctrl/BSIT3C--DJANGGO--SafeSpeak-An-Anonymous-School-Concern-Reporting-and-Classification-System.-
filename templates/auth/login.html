@@ -1,85 +1,58 @@
-{% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <title>
-    Sign in - SafeSpeak
-  </title>
-  <link href="{% static 'libs/jsvectormap/dist/jsvectormap.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-flags.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-socials.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-payments.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-vendors.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-marketing.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-themes.css' %}" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
+{% extends "theme/auth_base.html" %}
 
-<body>
-  <script src="{% static 'js/tabler-theme.js' %}"></script>
-  <div class="page page-center">
-    <div class="container container-tight py-4">
+{% block auth_title %}Sign in - SafeSpeak{% endblock %}
 
-      <div class="text-center mb-4">
-        <div class="mb-2">
-          <span class="avatar avatar-lg bg-primary-lt text-primary">
-            <i class="fas fa-shield-halved fa-2x"></i>
-          </span>
-        </div>
-        <h1 class="h2 mb-1">Safe<span class="text-primary">Speak</span></h1>
-        <div class="text-secondary">Anonymous school concern reporting</div>
-      </div>
-
-     <div class="card card-md">
-      <div class="card-body">
-
-        <h2 class="h3 text-center mb-4">Sign in to your account</h2>
-
-        <form method="post">
-          {% csrf_token %}
-
-          {% if messages %}
-          {% for message in messages %}
-          <div id="error-message" class="alert alert-danger">
-            {{ message }}
-          </div>
-          {% endfor %}
-          {% endif %}
-          <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-control" name="username" autocomplete="off" {% if locked %}disabled{% endif %}>
-          </div>
-          <div class="mb-2">
-            <label class="form-label">
-              Password
-            </label>
-            <div class="input-group input-group-flat">
-              <input type="password" class="form-control" name="password" autocomplete="off" {% if locked %}disabled{% endif %}>
-            </div>
-          </div>
-          <div class="form-footer d-flex justify-content-end">
-            <button type="submit" class="btn btn-primary w-50">
-              <i class="fas fa-sign-in-alt me-1"></i> Sign in
-            </button>
-          </div>
-       </form>
-     </div>
-   </div>
- </div>
- <!-- <div class="text-center text-secondary mt-n1">
-  Don't have an account?
-  <a href="{% url 'register' %}" class="text-primary fw-bold">Register</a>
- </div> -->
+{% block auth_card %}
+<div class="sd-auth-card-head">
+  <span class="sd-eyebrow"><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>Welcome back</span>
+  <h2>Sign in to your account</h2>
+  <p class="sd-auth-card-sub">Pick up where you left off. Your reports and replies are waiting for you.</p>
 </div>
 
-{% include 'theme/settings.html' %}
+<form method="post" class="sd-auth-form">
+  {% csrf_token %}
+  {% if next %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {% endif %}
 
-<script src="{% static 'js/tabler.js' %}" defer></script>
-<script src="{% static 'js/demo.js' %}" defer></script>
+  {% if messages %}
+  {% for message in messages %}
+  <div id="error-message" class="sd-auth-error" role="alert">
+    <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+    {{ message }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="form-group">
+    <label class="form-label" for="login-username">Username</label>
+    <input type="text" class="form-control" id="login-username" name="username" autocomplete="username" placeholder="Your SafeSpeak username" {% if locked %}disabled{% endif %}>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label" for="login-password">Password</label>
+    <input type="password" class="form-control" id="login-password" name="password" autocomplete="current-password" placeholder="Your password" {% if locked %}disabled{% endif %}>
+  </div>
+
+  <button type="submit" class="sd-btn sd-btn-primary" {% if locked %}disabled{% endif %}>
+    <i class="fas fa-sign-in-alt" aria-hidden="true"></i><span>Sign in</span>
+  </button>
+</form>
+
+<div class="sd-auth-divider">New to SafeSpeak?</div>
+
+<p class="sd-auth-switch">
+  Don't have an account?
+  <a href="{% url 'register' %}">Create account</a>
+</p>
+
+<div class="sd-auth-note">
+  <i class="fas fa-user-secret" aria-hidden="true"></i>
+  <span>SafeSpeak is anonymous by default. Signing in is only needed to track reports you choose to link to your account.</span>
+</div>
+{% endblock %}
+
+{% block auth_js %}
 {% if locked %}
 <script>
   let remaining = {{ remaining }};
@@ -99,68 +72,4 @@
   }, 1000);
 </script>
 {% endif %}
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    var themeConfig = {
-      theme: "light",
-      "theme-base": "gray",
-      "theme-font": "sans-serif",
-      "theme-primary": "blue",
-      "theme-radius": "1",
-    };
-
-    var url = new URL(window.location);
-    var form = document.getElementById("offcanvasSettings");
-    var resetButton = document.getElementById("reset-changes");
-
-    var checkItems = function () {
-      for (var key in themeConfig) {
-        var value =
-        window.localStorage["tabler-" + key] || themeConfig[key];
-
-        if (!!value) {
-          var radios = form.querySelectorAll(`[name="${key}"]`);
-
-          if (!!radios) {
-            radios.forEach((radio) => {
-              radio.checked = radio.value === value;
-            });
-          }
-        }
-      }
-    };
-
-    form.addEventListener("change", function (event) {
-      var target = event.target,
-      name = target.name,
-      value = target.value;
-
-      for (var key in themeConfig) {
-        if (name === key) {
-          document.documentElement.setAttribute("data-bs-" + key, value);
-          window.localStorage.setItem("tabler-" + key, value);
-          url.searchParams.set(key, value);
-        }
-      }
-
-      window.history.pushState({}, "", url);
-    });
-
-    resetButton.addEventListener("click", function () {
-      for (var key in themeConfig) {
-        var value = themeConfig[key];
-        document.documentElement.removeAttribute("data-bs-" + key);
-        window.localStorage.removeItem("tabler-" + key);
-        url.searchParams.delete(key);
-      }
-
-      checkItems();
-
-      window.history.pushState({}, "", url);
-    });
-
-    checkItems();
-  });
-</script>
-</body>
-</html>
+{% endblock %}

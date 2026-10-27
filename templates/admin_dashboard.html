@@ -1,29 +1,34 @@
-{% extends "theme/base.html" %}
+{% extends "theme/dashboard_base.html" %}
 {% load static %}
 
-{% block extra_css %}
-<link href="{% static 'css/guardian.css' %}" rel="stylesheet" />
-{% endblock %}
+{% block dashboard_content %}
+<div class="sd-page">
 
-{% block content %}
-<div class="gs-page">
-
-  <div class="gs-page-head">
-    <div>
-      <div class="gs-pretitle">Administration</div>
-      <h1 class="gs-title">Reports overview</h1>
-      <p class="gs-subtitle">Monitor, triage, and resolve anonymous submissions from the SafeSpeak community.</p>
+  <header class="sd-topbar">
+    <div class="sd-topbar-copy">
+      <span class="sd-eyebrow"><i class="fas fa-shield-halved" aria-hidden="true"></i>Administration &middot; {% now "D, M j, Y" %}</span>
+      <h1 class="sd-title">Reports <em>overview</em></h1>
+      <p class="sd-subtitle">A clear view of every anonymous submission. Triage what needs attention, follow the progress, and keep SafeSpeak moving.</p>
     </div>
-    <div class="gs-head-actions">
-      <span class="gs-date"><i class="far fa-calendar" aria-hidden="true"></i> {% now "D, M j, Y" %}</span>
-      <a href="{% url 'users:user_list' %}" class="btn btn-outline-secondary">
-        <i class="fas fa-users me-1" aria-hidden="true"></i> Manage users
+    <div class="sd-topbar-actions">
+      <form class="sd-search" method="get" action="{% url 'admin_dashboard' %}#reports" role="search">
+        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" name="q" value="{{ query }}" placeholder="Search reports" aria-label="Search reports">
+        {% if current_status %}<input type="hidden" name="status" value="{{ current_status }}">{% endif %}
+        {% if current_category %}<input type="hidden" name="category" value="{{ current_category }}">{% endif %}
+      </form>
+      <a href="{% url 'admin_activity_history' %}" class="sd-icon-btn" aria-label="View activity history">
+        <i class="far fa-bell" aria-hidden="true"></i>
+        {% if new_this_week %}<span class="sd-icon-badge">{{ new_this_week }}</span>{% endif %}
+      </a>
+      <a href="#reports" class="sd-btn sd-btn-primary">
+        <i class="fas fa-sliders" aria-hidden="true"></i><span>Review queue</span>
       </a>
     </div>
-  </div>
+  </header>
 
   {% if messages %}
-  <div class="mb-3">
+  <div class="sd-messages">
     {% for message in messages %}
     <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
       <i class="fas {% if message.tags == 'success' %}fa-circle-check{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} alert-icon" aria-hidden="true"></i>
@@ -34,393 +39,397 @@
   </div>
   {% endif %}
 
-  <div class="gs-kpi-grid">
-    <article class="gs-kpi">
-      <div class="gs-kpi-top">
-        <span class="gs-kpi-icon is-primary"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
-        <span class="gs-kpi-chip {% if new_this_week %}is-positive{% endif %}">
-          {% if new_this_week %}<i class="fas fa-arrow-trend-up" aria-hidden="true"></i>{% endif %}
-          {{ new_this_week }} new this week
-        </span>
+  <section class="sd-kpi-grid" aria-label="Report overview">
+    <article class="sd-kpi">
+      <span class="sd-kpi-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Total reports</span>
+        <strong class="sd-kpi-value">{{ total_reports }}</strong>
+        <span class="sd-kpi-meta">{{ total_concerns }} concern{{ total_concerns|pluralize }} &middot; {{ total_confessions }} confession{{ total_confessions|pluralize }}</span>
       </div>
-      <div class="gs-kpi-value">{{ total_reports }}</div>
-      <div class="gs-kpi-label">Total reports</div>
-      <div class="gs-kpi-meta">
-        {{ total_concerns }} concern{{ total_concerns|pluralize }} &middot;
-        {{ total_confessions }} confession{{ total_confessions|pluralize }}
-      </div>
+      <span class="sd-kpi-chip{% if new_this_week %} is-positive{% endif %}">
+        {% if new_this_week %}<i class="fas fa-arrow-trend-up" aria-hidden="true"></i>{% endif %}
+        {{ new_this_week }} new
+      </span>
     </article>
 
-    <article class="gs-kpi">
-      <div class="gs-kpi-top">
-        <span class="gs-kpi-icon is-warning"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
-        <span class="gs-kpi-chip">{% if open_reports %}Needs review{% else %}Queue clear{% endif %}</span>
+    <article class="sd-kpi is-amber">
+      <span class="sd-kpi-icon"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Open cases</span>
+        <strong class="sd-kpi-value">{{ open_reports }}</strong>
+        <span class="sd-kpi-meta">Awaiting review or resolution</span>
       </div>
-      <div class="gs-kpi-value">{{ open_reports }}</div>
-      <div class="gs-kpi-label">Open cases</div>
-      <div class="gs-kpi-meta">Awaiting review or resolution</div>
+      <span class="sd-kpi-chip {% if open_reports %}is-warn{% endif %}">
+        {% if open_reports %}Needs review{% else %}Queue clear{% endif %}
+      </span>
     </article>
 
-    <article class="gs-kpi">
-      <div class="gs-kpi-top">
-        <span class="gs-kpi-icon is-success"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
-        <span class="gs-kpi-chip {% if resolution_rate >= 50 %}is-positive{% endif %}">{{ resolution_rate }}% resolution</span>
+    <article class="sd-kpi is-teal">
+      <span class="sd-kpi-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Resolved</span>
+        <strong class="sd-kpi-value">{{ resolved_reports }}</strong>
+        <span class="sd-kpi-meta">Reports closed with a resolution</span>
       </div>
-      <div class="gs-kpi-value">{{ resolved_reports }}</div>
-      <div class="gs-kpi-label">Resolved</div>
-      <div class="gs-kpi-meta">Reports closed with a resolution</div>
+      <span class="sd-kpi-chip">{{ resolution_rate }}% closed</span>
     </article>
 
-    <article class="gs-kpi">
-      <div class="gs-kpi-top">
-        <span class="gs-kpi-icon is-danger"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
-        <span class="gs-kpi-chip {% if urgent_reports %}is-alert{% else %}is-positive{% endif %}">
-          {% if urgent_reports %}Action needed{% else %}All clear{% endif %}
-        </span>
+    <article class="sd-kpi is-rose">
+      <span class="sd-kpi-icon"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Urgent open</span>
+        <strong class="sd-kpi-value">{{ urgent_reports }}</strong>
+        <span class="sd-kpi-meta">Flagged reports still open</span>
       </div>
-      <div class="gs-kpi-value">{{ urgent_reports }}</div>
-      <div class="gs-kpi-label">Urgent open</div>
-      <div class="gs-kpi-meta">Flagged reports still open</div>
+      <span class="sd-kpi-chip {% if urgent_reports %}is-alert{% endif %}">
+        {% if urgent_reports %}Action needed{% else %}All clear{% endif %}
+      </span>
     </article>
-  </div>
-
-  <div class="row g-3 mb-1">
-    <div class="col-lg-8">
-      <section class="card gs-card gs-chart-card h-100" aria-labelledby="gs-volume-title">
-        <div class="card-header">
-          <div>
-            <h2 class="gs-card-title" id="gs-volume-title">Report volume</h2>
-            <p class="gs-card-sub">Submission activity across the last 7 days</p>
-          </div>
-          <div class="gs-legend" aria-hidden="true">
-            <span><span class="gs-dot" style="background: var(--tblr-primary);"></span>Concerns</span>
-            <span><span class="gs-dot" style="background: var(--tblr-muted);"></span>Confessions</span>
-          </div>
-        </div>
-        <div class="card-body">
-          <div id="gs-volume-chart" class="gs-chart"></div>
-        </div>
-      </section>
-    </div>
-
-    <div class="col-lg-4">
-      <section class="card gs-card h-100" aria-labelledby="gs-status-title">
-        <div class="card-header">
-          <div>
-            <h2 class="gs-card-title" id="gs-status-title">Case status</h2>
-            <p class="gs-card-sub">All reports by workflow stage</p>
-          </div>
-        </div>
-        <div class="card-body">
-          {% if total_reports %}
-          <div class="gs-donut-wrap">
-            <div id="gs-status-chart" class="gs-donut"></div>
-            <div class="gs-donut-center" aria-hidden="true">
-              <strong>{{ total_reports }}</strong>
-              <span>Reports</span>
-            </div>
-          </div>
-          {% else %}
-          <div class="gs-empty py-4">
-            <h3 class="gs-empty-title">No reports yet</h3>
-            <p class="gs-empty-text">Status totals will appear here.</p>
-          </div>
-          {% endif %}
-
-          {% if total_reports %}
-          <div class="gs-status-legend">
-            {% for item in status_breakdown %}
-            <div class="gs-legend-row">
-              <span><span class="gs-dot" style="background: {{ item.color }};"></span>{{ item.label }}</span>
-              <strong>{{ item.total }}</strong>
-            </div>
-            {% endfor %}
-          </div>
-          {% endif %}
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <section class="card gs-card gs-filter-card mt-3" aria-label="Filter reports">
-    <div class="card-body">
-      <form method="get" class="gs-filter" role="search">
-        <div class="gs-search">
-          <label class="form-label" for="gs-search-input">Search</label>
-          <div class="input-group">
-            <span class="input-group-text"><i class="fas fa-search" aria-hidden="true"></i></span>
-            <input type="search" id="gs-search-input" name="q" value="{{ query }}" class="form-control" placeholder="Ticket number, title, or description">
-          </div>
-        </div>
-
-        <div>
-          <label class="form-label" for="gs-status-filter">Status</label>
-          <select name="status" id="gs-status-filter" class="form-select">
-            <option value="">All statuses</option>
-            {% for code, label in status_choices %}
-            <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="form-label" for="gs-category-filter">Category</label>
-          <select name="category" id="gs-category-filter" class="form-select">
-            <option value="">All categories</option>
-            {% for cat in categories %}
-            <option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="gs-filter-actions">
-          <button type="submit" class="btn btn-primary"><i class="fas fa-sliders me-1" aria-hidden="true"></i> Apply</button>
-          <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary" title="Reset filters" aria-label="Reset filters">
-            <i class="fas fa-rotate-left" aria-hidden="true"></i>
-          </a>
-        </div>
-      </form>
-
-      {% if query or current_status or current_category %}
-      <div class="gs-filter-summary">
-        <i class="fas fa-filter" aria-hidden="true"></i>
-        <span>Filtered by</span>
-        {% if query %}
-        <span>Search: <strong>&ldquo;{{ query }}&rdquo;</strong></span>
-        {% endif %}
-        {% if current_status %}
-        <span>Status:
-          <strong>
-            {% for code, label in status_choices %}{% if code == current_status %}{{ label }}{% endif %}{% endfor %}
-          </strong>
-        </span>
-        {% endif %}
-        {% if current_category %}
-        <span>Category:
-          <strong>
-            {% for cat in categories %}{% if current_category == cat.id|stringformat:"s" %}{{ cat.name }}{% endif %}{% endfor %}
-          </strong>
-        </span>
-        {% endif %}
-        <a href="{% url 'admin_dashboard' %}">Clear all</a>
-      </div>
-      {% endif %}
-    </div>
   </section>
 
-  <section class="card gs-card gs-table-card" id="reports" aria-label="Report queue">
-    <div class="card-header">
-      <div class="gs-table-tabs" role="tablist" aria-label="Report type">
-        <button class="gs-tab active" id="gs-concerns-tab" data-bs-toggle="tab" data-bs-target="#gs-concerns" type="button" role="tab" aria-controls="gs-concerns" aria-selected="true">
-          Concerns <span class="gs-count">{{ concerns|length }}</span>
+  <div class="sd-grid">
+    <section class="sd-card sd-col-7 sd-chart-card" aria-labelledby="sd-volume-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-volume-title">Report volume</h2>
+          <p class="sd-card-sub">Submission activity across the last seven days.</p>
+        </div>
+        <div class="sd-chart-legend" aria-hidden="true">
+          <span><span class="sd-dot" style="--dot-color: #5b8064;"></span>Concerns</span>
+          <span><span class="sd-dot" style="--dot-color: #b9cfbd;"></span>Confessions</span>
+        </div>
+      </div>
+      <div id="sd-volume-chart" class="sd-chart"></div>
+    </section>
+
+    <section class="sd-card sd-col-5 sd-resolution-card" aria-labelledby="sd-resolution-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-resolution-title">Resolution</h2>
+          <p class="sd-card-sub">All reports by workflow stage.</p>
+        </div>
+        <span class="sd-status-pill {% if resolution_rate >= 50 %}is-resolved{% else %}is-review{% endif %}">{{ resolution_rate }}%</span>
+      </div>
+
+      <div class="sd-resolution">
+        <div class="sd-ring" style="--value: {{ resolution_rate }};" role="img" aria-label="{{ resolution_rate }} percent of reports resolved">
+          <div class="sd-ring-inner">
+            <span class="sd-ring-value">{{ resolution_rate }}<small>%</small></span>
+            <span class="sd-ring-label">Resolved</span>
+          </div>
+        </div>
+        <p class="sd-ring-caption"><strong>{{ resolved_reports }}</strong> of <strong>{{ total_reports }}</strong> reports have been resolved.</p>
+        <div class="sd-resolution-stats">
+          <div class="sd-resolution-stat"><strong>{{ total_reports }}</strong><span>Total</span></div>
+          <div class="sd-resolution-stat"><strong>{{ open_reports }}</strong><span>Open</span></div>
+          <div class="sd-resolution-stat"><strong>{{ resolved_reports }}</strong><span>Resolved</span></div>
+        </div>
+        <div class="sd-status-list">
+          {% for status in status_breakdown %}
+          <div class="sd-status-row">
+            <div class="sd-status-row-head">
+              <span class="sd-status-name"><span class="sd-dot" style="--dot-color: {{ status.color }};"></span>{{ status.label }}</span>
+              <span class="sd-status-count">{{ status.total }}</span>
+            </div>
+            <div class="sd-progress">
+              <span style="width: {{ status.percent }}%; --bar-color: {{ status.color }};"></span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="sd-card sd-col-7" aria-labelledby="sd-categories-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-categories-title">Categories</h2>
+          <p class="sd-card-sub">Folders for the topics students are talking about.</p>
+        </div>
+        <a href="{% url 'nlp_hub' %}" class="sd-link">Tune model <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+
+      {% if category_folders %}
+      <div class="sd-folder-grid">
+        {% for folder in category_folders %}
+        {% cycle 'fa-heart-pulse' 'fa-people-group' 'fa-building-columns' 'fa-book-open' 'fa-shield-halved' 'fa-leaf' 'fa-hand-holding-heart' 'fa-lightbulb' as folder_icon silent %}
+        <a class="sd-folder" href="{% url 'admin_dashboard' %}?category={{ folder.category.id }}#reports" title="Filter reports in {{ folder.category.name }}">
+          <span class="sd-folder-art"><i class="fas {{ folder_icon }}" aria-hidden="true"></i></span>
+          <span class="sd-folder-name">{{ folder.category.name }}</span>
+          <span class="sd-folder-count">{{ folder.total }} report{{ folder.total|pluralize }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="sd-folder-empty">No active categories yet. Add categories in the NLP workspace.</div>
+      {% endif %}
+    </section>
+
+    <section class="sd-card sd-col-5" aria-labelledby="sd-snapshots-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-snapshots-title">Recent reports</h2>
+          <p class="sd-card-sub">The newest submissions and their attachments.</p>
+        </div>
+        <a href="#reports" class="sd-link">Open queue <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
+      </div>
+
+      {% if recent_report_cards %}
+      <div class="sd-snap-grid">
+        {% for item in recent_report_cards %}
+        {% with thumb=item.report.images.all|first %}
+        <a href="{% url 'admin_report_detail' item.kind item.report.pk %}" class="sd-snap" aria-label="Open {{ item.report.title }}">
+          {% if thumb %}
+          <img src="{{ thumb.image.url }}" alt="Image attached to {{ item.report.title }}" loading="lazy">
+          {% else %}
+          <span class="sd-snap-placeholder {% if item.kind == 'confession' %}is-confession{% endif %}">
+            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
+          </span>
+          {% endif %}
+          <span class="sd-snap-body">
+            <span class="sd-snap-label">{{ item.label }} &middot; {{ item.report.category.name }}</span>
+            <span class="sd-snap-title">{{ item.report.title|truncatechars:42 }}</span>
+          </span>
+        </a>
+        {% endwith %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="sd-snap-empty">
+        <div><i class="fas fa-inbox" aria-hidden="true"></i>New reports will appear here.</div>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="sd-card sd-col-12" aria-labelledby="sd-activity-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-activity-title">Recent activity</h2>
+          <p class="sd-card-sub">The latest report and account actions across SafeSpeak.</p>
+        </div>
+        <a href="{% url 'admin_activity_history' %}" class="sd-link">Admin activity history <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+
+      {% if recent_activity %}
+      <ul class="sd-activity-list">
+        {% for log in recent_activity %}
+        <li class="sd-activity-item">
+          <span class="sd-activity-icon"><i class="fas {{ log.icon }}" aria-hidden="true"></i></span>
+          <div class="sd-activity-body">
+            <span class="sd-activity-action">{{ log.get_action_display }}</span>
+            <span class="sd-activity-detail">
+              {% if log.actor %}{{ log.actor.username }}{% else %}System{% endif %}
+              {% if log.report %}
+              &middot;
+              <a href="{% url 'admin_report_detail' log.kind log.report.pk %}">{{ log.report.title|truncatechars:46 }}</a>
+              {% endif %}
+              {% if log.target_user %}
+              &middot; Account {{ log.target_user.username }}
+              {% endif %}
+            </span>
+          </div>
+          <time class="sd-activity-time">{{ log.created_at|date:"M j, g:i A" }}</time>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="sd-panel-empty">
+        <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+        <strong>No activity recorded yet</strong>
+        <span>Actions on reports and accounts will appear here.</span>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="sd-card" aria-label="Filter reports">
+    <form method="get" action="{% url 'admin_dashboard' %}#reports" class="sd-filter" role="search">
+      <div class="sd-filter-field">
+        <label for="sd-search-input">Search</label>
+        <div class="sd-input-wrap">
+          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" id="sd-search-input" name="q" value="{{ query }}" class="sd-input" placeholder="Title or description">
+        </div>
+      </div>
+
+      <div class="sd-filter-field">
+        <label for="sd-status-filter">Status</label>
+        <select name="status" id="sd-status-filter" class="sd-select">
+          <option value="">All statuses</option>
+          {% for code, label in status_choices %}
+          <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="sd-filter-field">
+        <label for="sd-category-filter">Category</label>
+        <select name="category" id="sd-category-filter" class="sd-select">
+          <option value="">All categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="sd-filter-actions">
+        <button type="submit" class="sd-btn sd-btn-primary"><i class="fas fa-sliders" aria-hidden="true"></i>Apply</button>
+        <a href="{% url 'admin_dashboard' %}" class="sd-filter-reset" title="Reset filters" aria-label="Reset filters">
+          <i class="fas fa-rotate-left" aria-hidden="true"></i>
+        </a>
+      </div>
+    </form>
+
+    {% if query or current_status or current_category %}
+    <div class="sd-filter-summary">
+      <i class="fas fa-filter" aria-hidden="true"></i>
+      <span>Filtered by</span>
+      {% if query %}
+      <span>Search: <strong>&ldquo;{{ query }}&rdquo;</strong></span>
+      {% endif %}
+      {% if current_status %}
+      <span>Status:
+        <strong>
+          {% for code, label in status_choices %}{% if code == current_status %}{{ label }}{% endif %}{% endfor %}
+        </strong>
+      </span>
+      {% endif %}
+      {% if current_category %}
+      <span>Category:
+        <strong>
+          {% for cat in categories %}{% if current_category == cat.id|stringformat:"s" %}{{ cat.name }}{% endif %}{% endfor %}
+        </strong>
+      </span>
+      {% endif %}
+      <a href="{% url 'admin_dashboard' %}">Clear all</a>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="sd-card sd-table-card" id="reports" aria-label="Report queue">
+    <div class="sd-table-head">
+      <div class="sd-tabs" role="tablist" aria-label="Report type">
+        <button class="sd-tab active" id="sd-concerns-tab" data-bs-toggle="tab" data-bs-target="#sd-concerns" type="button" role="tab" aria-controls="sd-concerns" aria-selected="true">
+          Concerns <span class="sd-tab-count">{{ concerns|length }}</span>
         </button>
-        <button class="gs-tab" id="gs-confessions-tab" data-bs-toggle="tab" data-bs-target="#gs-confessions" type="button" role="tab" aria-controls="gs-confessions" aria-selected="false">
-          Confessions <span class="gs-count">{{ confessions|length }}</span>
+        <button class="sd-tab" id="sd-confessions-tab" data-bs-toggle="tab" data-bs-target="#sd-confessions" type="button" role="tab" aria-controls="sd-confessions" aria-selected="false">
+          Confessions <span class="sd-tab-count">{{ confessions|length }}</span>
         </button>
       </div>
-      <div class="gs-result-count">{{ filtered_total }} result{{ filtered_total|pluralize }}</div>
+      <span class="sd-result-count">{{ filtered_total }} result{{ filtered_total|pluralize }}</span>
     </div>
 
     <div class="tab-content">
-      <div class="tab-pane fade show active" id="gs-concerns" role="tabpanel" aria-labelledby="gs-concerns-tab">
+      <div class="tab-pane fade show active" id="sd-concerns" role="tabpanel" aria-labelledby="sd-concerns-tab">
         {% include "theme/admin_report_table.html" with reports=concerns kind="concern" type_label="Concern" %}
       </div>
-      <div class="tab-pane fade" id="gs-confessions" role="tabpanel" aria-labelledby="gs-confessions-tab">
+      <div class="tab-pane fade" id="sd-confessions" role="tabpanel" aria-labelledby="sd-confessions-tab">
         {% include "theme/admin_report_table.html" with reports=confessions kind="confession" type_label="Confession" %}
       </div>
     </div>
   </section>
 
-  {{ weekly_labels|json_script:"gs-weekly-labels" }}
-  {{ weekly_concerns|json_script:"gs-weekly-concerns" }}
-  {{ weekly_confessions|json_script:"gs-weekly-confessions" }}
-  {{ status_breakdown|json_script:"gs-status-breakdown" }}
+  {{ weekly_labels|json_script:"sd-weekly-labels" }}
+  {{ weekly_concerns|json_script:"sd-weekly-concerns" }}
+  {{ weekly_confessions|json_script:"sd-weekly-confessions" }}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-(function () {
-  "use strict";
+  (function () {
+    "use strict";
 
-  var started = false;
+    var started = false;
 
-  function readJSON(id) {
-    var node = document.getElementById(id);
-    if (!node) return null;
-    try {
-      return JSON.parse(node.textContent);
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function palette() {
-    var styles = getComputedStyle(document.documentElement);
-    var rootTheme = document.documentElement.getAttribute("data-bs-theme");
-    var bodyTheme = document.body ? document.body.getAttribute("data-bs-theme") : null;
-    return {
-      primary: styles.getPropertyValue("--tblr-primary").trim() || "#4f46e5",
-      muted: styles.getPropertyValue("--tblr-muted").trim() || "#6e7591",
-      border: styles.getPropertyValue("--tblr-border-color").trim() || "#e6e8f2",
-      surface: styles.getPropertyValue("--tblr-bg-surface").trim() || "#ffffff",
-      dark: (rootTheme || bodyTheme) === "dark"
-    };
-  }
-
-  function initDashboardCharts() {
-    if (started || !window.ApexCharts) return;
-
-    var volumeElement = document.getElementById("gs-volume-chart");
-    var statusElement = document.getElementById("gs-status-chart");
-    if (!volumeElement) return;
-
-    var labels = readJSON("gs-weekly-labels") || [];
-    var concerns = readJSON("gs-weekly-concerns") || [];
-    var confessions = readJSON("gs-weekly-confessions") || [];
-    var breakdown = (readJSON("gs-status-breakdown") || []).filter(function (item) {
-      return item.total > 0;
-    });
-
-    started = true;
-    var colors = palette();
-
-    var volumeChart = new ApexCharts(volumeElement, {
-      chart: {
-        type: "area",
-        height: 372,
-        fontFamily: "inherit",
-        toolbar: { show: false },
-        animations: { enabled: false },
-        parentHeightOffset: 0,
-        background: "transparent"
-      },
-      series: [
-        { name: "Concerns", data: concerns },
-        { name: "Confessions", data: confessions }
-      ],
-      colors: [colors.primary, colors.muted],
-      dataLabels: { enabled: false },
-      stroke: { curve: "smooth", width: 2.5, lineCap: "round" },
-      fill: {
-        type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.22, opacityTo: 0.01, stops: [0, 92] }
-      },
-      grid: {
-        borderColor: colors.border,
-        strokeDashArray: 4,
-        padding: { top: 6, right: 10, left: 2, bottom: 0 }
-      },
-      xaxis: {
-        categories: labels,
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-        labels: { style: { colors: colors.muted, fontSize: "11px" }, rotate: 0, hideOverlappingLabels: false }
-      },
-      yaxis: {
-        min: 0,
-        forceNiceScale: true,
-        tickAmount: 4,
-        labels: {
-          style: { colors: colors.muted, fontSize: "11px" },
-          formatter: function (value) { return Math.round(value); }
-        }
-      },
-      legend: { show: false },
-      markers: { size: 0, hover: { size: 5 } },
-      tooltip: {
-        theme: colors.dark ? "dark" : "light",
-        y: {
-          formatter: function (value) {
-            return value + (value === 1 ? " report" : " reports");
-          }
-        }
-      },
-      noData: {
-        text: "No reports in the last 7 days",
-        align: "center",
-        verticalAlign: "middle",
-        style: { color: colors.muted, fontSize: "12px" }
+    function readJSON(id) {
+      var node = document.getElementById(id);
+      if (!node) return [];
+      try {
+        return JSON.parse(node.textContent);
+      } catch (error) {
+        return [];
       }
-    });
-    volumeChart.render();
+    }
 
-    var statusChart = null;
-    if (statusElement && breakdown.length) {
-      statusChart = new ApexCharts(statusElement, {
+    function initVolumeChart() {
+      if (started || !window.ApexCharts) return;
+
+      var element = document.getElementById("sd-volume-chart");
+      if (!element) return;
+
+      started = true;
+
+      var chart = new ApexCharts(element, {
         chart: {
-          type: "donut",
-          height: 196,
+          type: "area",
+          height: "100%",
           fontFamily: "inherit",
+          toolbar: { show: false },
           animations: { enabled: false },
+          parentHeightOffset: 0,
           background: "transparent"
         },
-        series: breakdown.map(function (item) { return item.total; }),
-        labels: breakdown.map(function (item) { return item.label; }),
-        colors: breakdown.map(function (item) { return item.color; }),
-        stroke: { width: 2, colors: [colors.surface] },
+        series: [
+          { name: "Concerns", data: readJSON("sd-weekly-concerns") },
+          { name: "Confessions", data: readJSON("sd-weekly-confessions") }
+        ],
+        colors: ["#5b8064", "#b9cfbd"],
         dataLabels: { enabled: false },
-        legend: { show: false },
-        plotOptions: {
-          pie: {
-            expandOnClick: false,
-            donut: {
-              size: "74%",
-              labels: { show: false }
-            }
+        stroke: { curve: "smooth", width: 2.5, lineCap: "round" },
+        fill: {
+          type: "gradient",
+          gradient: { shadeIntensity: 1, opacityFrom: 0.24, opacityTo: 0.01, stops: [0, 92] }
+        },
+        grid: {
+          borderColor: "#edf3ec",
+          strokeDashArray: 4,
+          padding: { top: 6, right: 10, left: 2, bottom: 0 }
+        },
+        xaxis: {
+          categories: readJSON("sd-weekly-labels"),
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: "#7c8b80", fontSize: "10px" }, rotate: 0, hideOverlappingLabels: false }
+        },
+        yaxis: {
+          min: 0,
+          forceNiceScale: true,
+          tickAmount: 3,
+          labels: {
+            style: { colors: "#7c8b80", fontSize: "10px" },
+            formatter: function (value) { return Math.round(value); }
           }
         },
+        legend: { show: false },
+        markers: { size: 0, hover: { size: 4 } },
         tooltip: {
-          theme: colors.dark ? "dark" : "light",
+          theme: "light",
           y: {
             formatter: function (value) {
               return value + (value === 1 ? " report" : " reports");
             }
           }
+        },
+        noData: {
+          text: "No reports in the last 7 days",
+          align: "center",
+          verticalAlign: "middle",
+          style: { color: "#7c8b80", fontSize: "11px" }
         }
       });
-      statusChart.render();
+
+      chart.render();
     }
 
-    if (!window.MutationObserver) return;
-
-    var observer = new MutationObserver(function () {
-      var next = palette();
-      volumeChart.updateOptions({
-        colors: [next.primary, next.muted],
-        grid: { borderColor: next.border },
-        xaxis: { labels: { style: { colors: next.muted } } },
-        yaxis: { labels: { style: { colors: next.muted } } },
-        tooltip: { theme: next.dark ? "dark" : "light" }
-      }, false, false);
-
-      if (statusChart) {
-        statusChart.updateOptions({
-          stroke: { width: 2, colors: [next.surface] },
-          tooltip: { theme: next.dark ? "dark" : "light" }
-        }, false, false);
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-bs-theme", "data-bs-theme-primary"]
-    });
-    if (document.body) {
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ["data-bs-theme", "data-bs-theme-primary"]
-      });
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initVolumeChart);
+      window.addEventListener("load", initVolumeChart);
+    } else {
+      initVolumeChart();
+      window.addEventListener("load", initVolumeChart);
     }
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initDashboardCharts);
-    window.addEventListener("load", initDashboardCharts);
-  } else {
-    initDashboardCharts();
-    window.addEventListener("load", initDashboardCharts);
-  }
-})();
+  })();
 </script>
 {% endblock %}

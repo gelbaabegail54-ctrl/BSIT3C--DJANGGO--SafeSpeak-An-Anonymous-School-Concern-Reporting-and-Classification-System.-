@@ -1,0 +1,477 @@
+{% extends "theme/sage_page_base.html" %}
+{% load static %}
+
+{% block page_eyebrow %}<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>Administration{% endblock %}
+{% block page_title %}{% block nlp_title %}<em>NLP categorization hub</em>{% endblock %}{% endblock %}
+{% block page_subtitle %}{% block nlp_subtitle %}Review machine-assisted categories, apply suggestions, and tune the keyword model that triages incoming concerns and confessions.{% endblock %}{% endblock %}
+
+{% block page_actions %}
+<span class="sd-badge is-muted"><i class="far fa-calendar" aria-hidden="true"></i>{% now "D, M j, Y" %}</span>
+<a href="{% url 'admin_dashboard' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-shield-halved" aria-hidden="true"></i><span>Manage reports</span>
+</a>
+<form method="post" class="d-inline">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="analyze_all" />
+  <button type="submit" class="sd-btn sd-btn-primary">
+    <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Re-run analysis</span>
+  </button>
+</form>
+{% endblock %}
+
+{% block page_content %}
+{% if unanalyzed_count %}
+<div class="sd-note" role="status">
+  <i class="fas fa-circle-info" aria-hidden="true"></i>
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; width: 100%;">
+    <span><strong>{{ unanalyzed_count }} report{{ unanalyzed_count|pluralize }} {% if unanalyzed_count == 1 %}hasn't{% else %}haven't{% endif %} been analyzed yet.</strong> Run the model to generate category suggestions and confidence scores for the review queue.</span>
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="analyze_all" />
+      <button type="submit" class="sd-btn sd-btn-primary">
+        <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Analyze now</span>
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<section class="sd-kpi-grid" aria-label="NLP overview">
+  <article class="sd-kpi">
+    <span class="sd-kpi-icon"><i class="fas fa-microchip" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Reports analyzed</span>
+      <strong class="sd-kpi-value">{{ analyzed_count }}</strong>
+      <span class="sd-kpi-meta">Of {{ total_reports }} report{{ total_reports|pluralize }} in SafeSpeak</span>
+    </div>
+    <span class="sd-kpi-chip {% if not unanalyzed_count %}is-good{% else %}is-warn{% endif %}">
+      {% if unanalyzed_count %}{{ unanalyzed_count }} pending{% else %}Up to date{% endif %}
+    </span>
+  </article>
+
+  <article class="sd-kpi is-amber">
+    <span class="sd-kpi-icon"><i class="fas fa-code-compare" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Suggested changes</span>
+      <strong class="sd-kpi-value">{{ mismatch_count }}</strong>
+      <span class="sd-kpi-meta">NLP disagrees with the assigned category</span>
+    </div>
+    <span class="sd-kpi-chip {% if not mismatch_count %}is-good{% else %}is-warn{% endif %}">
+      {% if mismatch_count %}Review{% else %}Aligned{% endif %}
+    </span>
+  </article>
+
+  <article class="sd-kpi is-rose">
+    <span class="sd-kpi-icon"><i class="fas fa-signal" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Low confidence</span>
+      <strong class="sd-kpi-value">{{ low_confidence_count }}</strong>
+      <span class="sd-kpi-meta">Analyzed reports that may need a human decision</span>
+    </div>
+    <span class="sd-kpi-chip is-warn">{{ low_confidence_threshold }}% threshold</span>
+  </article>
+
+  <article class="sd-kpi is-teal">
+    <span class="sd-kpi-icon"><i class="fas fa-tags" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Active categories</span>
+      <strong class="sd-kpi-value">{{ active_category_count }}</strong>
+      <span class="sd-kpi-meta">{{ category_count }} categor{{ category_count|pluralize:"y,ies" }} in the model library</span>
+    </div>
+    <span class="sd-kpi-chip">{{ average_confidence }}% avg confidence</span>
+  </article>
+</section>
+
+<div class="sd-grid" id="review">
+  <div class="sd-col-8">
+    <section class="sd-card sd-table-card" aria-labelledby="nlp-review-title">
+      <div class="sd-card-head sd-table-head">
+        <div>
+          <h2 class="sd-card-title" id="nlp-review-title">Classification review</h2>
+          <p class="sd-card-sub">Ranked by category mismatch, low confidence, and recency</p>
+        </div>
+        <span class="sd-badge">{{ queue_total }} result{{ queue_total|pluralize }}</span>
+      </div>
+
+      <div class="sd-tabs" style="margin-bottom: 14px; flex-wrap: wrap;">
+        {% for value, label in queue_filters %}
+        <a href="?filter={{ value }}#review" class="sd-tab {% if queue_filter == value %}active{% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+
+      <div class="sd-table-wrap">
+        <table class="sd-table">
+          <thead>
+            <tr>
+              <th scope="col">Report</th>
+              <th scope="col">Current</th>
+              <th scope="col">NLP suggestion</th>
+              <th scope="col">Signals</th>
+              <th scope="col" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in queue %}
+            <tr>
+              <td>
+                <div style="color: var(--sd-ink-soft); font-size: 10.5px; font-weight: 650; line-height: 1.4;" title="{{ item.title }}">{{ item.title }}</div>
+                <div class="sd-report-card-meta" style="margin-top: 3px;">
+                  <span><i class="fas {% if item.kind == 'concern' %}fa-circle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>{{ item.kind_label }}</span>
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>{{ item.submitted_at|date:"M j, Y" }}</span>
+                  {% if not item.analyzed %}
+                  <span class="sd-badge is-muted">Not analyzed</span>
+                  {% elif item.mismatch %}
+                  <span class="sd-badge is-warning">Suggestion differs</span>
+                  {% elif item.low_confidence %}
+                  <span class="sd-badge is-danger">Low confidence</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="sd-badge">{{ item.current_category }}</span>
+              </td>
+              <td class="sd-suggestion">
+                {% if item.suggested_category %}
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                  <span class="sd-badge {% if item.mismatch %}is-warning{% else %}is-success{% endif %}">{{ item.suggested_category }}</span>
+                  <span class="sd-result-count">{{ item.confidence }}%</span>
+                </div>
+                <div class="sd-meter" style="margin-top: 5px;">
+                  <span style="width: {{ item.confidence }}%;"></span>
+                </div>
+                {% else %}
+                <span class="sd-note-text">No strong match</span>
+                {% endif %}
+              </td>
+              <td>
+                <div style="display: flex; flex-wrap: wrap;">
+                  {% for signal in item.signals|slice:":3" %}
+                  <span class="sd-keyword">{{ signal }}</span>
+                  {% empty %}
+                  <span class="sd-note-text">&mdash;</span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td class="text-end">
+                <div class="sd-row-actions" style="justify-content: flex-end;">
+                  {% if item.mismatch %}
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="apply" />
+                    <input type="hidden" name="kind" value="{{ item.kind }}" />
+                    <input type="hidden" name="pk" value="{{ item.report.pk }}" />
+                    <button type="submit" class="sd-btn sd-btn-primary" style="height: 32px; padding: 0 11px; font-size: 9.5px;" title="Apply the NLP suggestion">
+                      <i class="fas fa-check" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Apply</span>
+                    </button>
+                  </form>
+                  {% endif %}
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="analyze_report" />
+                    <input type="hidden" name="kind" value="{{ item.kind }}" />
+                    <input type="hidden" name="pk" value="{{ item.report.pk }}" />
+                    <button type="submit" class="sd-btn sd-btn-soft" style="width: 32px; height: 32px; padding: 0;" title="Re-run NLP analysis">
+                      <i class="fas fa-rotate" aria-hidden="true"></i>
+                    </button>
+                  </form>
+                  <a href="{{ item.detail_url }}" class="sd-btn sd-btn-soft" style="width: 32px; height: 32px; padding: 0;" title="Open report">
+                    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5">
+                <div class="sd-report-empty">
+                  <i class="fas fa-circle-check" aria-hidden="true"></i>
+                  <strong>Nothing needs attention here</strong>
+                  <span>
+                    {% if queue_filter == 'attention' %}
+                    Every analyzed report is aligned and above the confidence threshold.
+                    <a href="?filter=all#review" style="color: var(--sd-sage-700); font-weight: 700;">Browse all reports</a>.
+                    {% else %}
+                    No reports match this filter.
+                    {% endif %}
+                  </span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if queue.paginator.num_pages > 1 %}
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--sd-line);">
+        <span class="sd-result-count">Page {{ queue.number }} of {{ queue.paginator.num_pages }}</span>
+        <div style="display: flex; gap: 6px;">
+          {% if queue.has_previous %}
+          <a href="?filter={{ queue_filter }}&page={{ queue.previous_page_number }}#review" class="sd-btn sd-btn-soft">
+            <i class="fas fa-chevron-left" aria-hidden="true"></i><span>Previous</span>
+          </a>
+          {% endif %}
+          {% if queue.has_next %}
+          <a href="?filter={{ queue_filter }}&page={{ queue.next_page_number }}#review" class="sd-btn sd-btn-soft">
+            <span>Next</span><i class="fas fa-chevron-right" aria-hidden="true"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="sd-col-4">
+    <section class="sd-form-card sd-sample-card" aria-labelledby="nlp-sample-title">
+      <div class="sd-form-card-head">
+        <span class="sd-report-kind"><i class="fas fa-flask" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="sd-form-card-title" id="nlp-sample-title">Try the model</h2>
+          <p class="sd-form-card-sub">Analyze text without saving a report.</p>
+        </div>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="analyze_sample" />
+        <label for="nlp-sample-text" class="form-label">Report text</label>
+        <textarea id="nlp-sample-text" name="sample_text" rows="5" class="form-control" placeholder="Paste a concern or confession to see how SafeSpeak would categorize it...">{{ sample.text|default:'' }}</textarea>
+        <button type="submit" class="sd-btn sd-btn-primary" style="width: 100%; margin-top: 10px;">
+          <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>Analyze text</span>
+        </button>
+      </form>
+
+      {% if sample %}
+      <div class="sd-sample-result">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+          <div>
+            <div class="sd-detail-item" style="padding: 0; border: 0; background: none;">
+              <span>Prediction</span>
+              <strong style="font-size: 12px;">{{ sample.category }}</strong>
+            </div>
+          </div>
+          <span class="sd-badge {% if sample.confidence >= 75 %}is-success{% elif sample.confidence >= low_confidence_threshold %}is-warning{% else %}is-danger{% endif %}">
+            {{ sample.confidence }}% confidence
+          </span>
+        </div>
+        <div class="sd-meter" style="margin-bottom: 13px;">
+          <span style="width: {{ sample.confidence }}%;"></span>
+        </div>
+
+        {% if sample.signals %}
+        <div style="margin-bottom: 13px;">
+          <div class="sd-result-count" style="margin-bottom: 5px;">Matched signals</div>
+          <div style="display: flex; flex-wrap: wrap;">
+            {% for signal in sample.signals %}
+            <span class="sd-keyword">{{ signal }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% elif not sample.matched %}
+        <p class="sd-note-text" style="margin-bottom: 13px;">
+          No keyword signal was detected, so this text would fall back to the <strong>General</strong> category. Add more keywords below to improve coverage.
+        </p>
+        {% endif %}
+
+        {% if sample.scores %}
+        <div>
+          <div class="sd-result-count" style="margin-bottom: 7px;">Category scores</div>
+          {% for score in sample.scores|slice:":5" %}
+          <div class="sd-score-row">
+            <span class="text-truncate" title="{{ score.name }}">{{ score.name }}</span>
+            <div class="sd-score-bar"><span style="width: {{ score.share }}%;"></span></div>
+            <strong class="text-end">{{ score.share }}%</strong>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <p class="sd-note-text" style="margin: 13px 0 0;">
+        <i class="fas fa-lock me-1" aria-hidden="true"></i>
+        Text is analyzed on this server with a transparent keyword and phrase model. No report content is sent to an external service.
+      </p>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="nlp-how-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="nlp-how-title"><i class="fas fa-gauge-high" aria-hidden="true"></i>How the confidence works</h2>
+      <p>The model tokenizes the text, matches exact words, phrases, and prefix keywords, then weighs the winning category against the rest.</p>
+      <p>Confidence rises when a category has strong, repeated signals and a clear lead. Reports below {{ low_confidence_threshold }}% are surfaced for review.</p>
+    </section>
+  </aside>
+</div>
+
+<section class="sd-card sd-table-card" id="categories" aria-labelledby="nlp-categories-title">
+  <div class="sd-card-head sd-table-head">
+    <div>
+      <h2 class="sd-card-title" id="nlp-categories-title">Category model</h2>
+      <p class="sd-card-sub">Keywords are comma-separated. Add <code>*</code> to the end of a word for prefix matching.</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 7px;">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="seed_defaults" />
+        <button type="submit" class="sd-btn sd-btn-soft">
+          <i class="fas fa-seedling" aria-hidden="true"></i><span>Load defaults</span>
+        </button>
+      </form>
+      <button type="button" class="sd-btn sd-btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+        <i class="fas fa-plus" aria-hidden="true"></i><span>Add category</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sd-table-wrap">
+    <table class="sd-table">
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Keywords</th>
+          <th scope="col">Reports</th>
+          <th scope="col">Status</th>
+          <th scope="col" class="text-end">Edit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in categories %}
+        <tr>
+          <td>
+            <div style="color: var(--sd-ink-soft); font-size: 10.5px; font-weight: 700;">{{ item.category.name }}</div>
+            {% if item.category.description %}
+            <div class="sd-note-text">{{ item.category.description|truncatechars:90 }}</div>
+            {% endif %}
+          </td>
+          <td style="max-width: 430px;">
+            <div style="display: flex; flex-wrap: wrap;">
+              {% for keyword in item.keywords|slice:":6" %}
+              <span class="sd-keyword">{{ keyword }}</span>
+              {% empty %}
+              <span class="sd-note-text">Name only</span>
+              {% endfor %}
+              {% if item.keyword_count > 6 %}
+              <span class="sd-keyword">+{{ item.keyword_count|add:"-6" }} more</span>
+              {% endif %}
+            </div>
+            {% if item.using_defaults and item.keyword_count %}
+            <span class="sd-badge">Built-in defaults</span>
+            {% endif %}
+          </td>
+          <td style="min-width: 130px;">
+            <div style="display: flex; justify-content: space-between; color: var(--sd-ink-soft); font-size: 9.5px;">
+              <span>{{ item.total }} report{{ item.total|pluralize }}</span>
+              <span style="color: var(--sd-muted);">{{ item.share }}%</span>
+            </div>
+            <div class="sd-meter" style="margin-top: 5px;">
+              <span style="width: {{ item.share }}%;"></span>
+            </div>
+          </td>
+          <td>
+            {% if item.category.is_active %}
+            <span class="sd-badge is-success">Active</span>
+            {% else %}
+            <span class="sd-badge is-muted">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <button type="button" class="sd-btn sd-btn-soft" data-bs-toggle="collapse" data-bs-target="#category-edit-{{ item.category.pk }}" aria-expanded="false" aria-controls="category-edit-{{ item.category.pk }}" style="height: 32px; padding: 0 11px; font-size: 9.5px;">
+              <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+              <span class="d-none d-xl-inline ms-1">Edit</span>
+            </button>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5" style="padding: 0; border: 0;">
+            <div class="collapse" id="category-edit-{{ item.category.pk }}">
+              <form method="post" class="p-3" style="background: var(--sd-sage-50);">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_category" />
+                <input type="hidden" name="category_id" value="{{ item.category.pk }}" />
+                <div class="sd-detail-grid" style="margin-top: 0;">
+                  <div>
+                    <label class="form-label" for="category-name-{{ item.category.pk }}">Name</label>
+                    <input type="text" class="form-control" id="category-name-{{ item.category.pk }}" name="name" value="{{ item.category.name }}" required />
+                  </div>
+                  <div>
+                    <label class="form-label" for="category-description-{{ item.category.pk }}">Description</label>
+                    <input type="text" class="form-control" id="category-description-{{ item.category.pk }}" name="description" value="{{ item.category.description }}" />
+                  </div>
+                  <div style="grid-column: 1 / -1;">
+                    <label class="form-label" for="category-keywords-{{ item.category.pk }}">Keywords</label>
+                    <textarea class="form-control" id="category-keywords-{{ item.category.pk }}" name="keywords" rows="2" placeholder="bully*, harass*, threat*, name-calling">{{ item.category.keywords }}</textarea>
+                    {% if item.using_defaults and item.keyword_count %}
+                    <div class="form-hint">Leave empty to keep using the built-in defaults shown above.</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px;">
+                  <label class="form-check mb-0">
+                    <input type="checkbox" class="form-check-input" name="is_active" {% if item.category.is_active %}checked{% endif %} />
+                    <span class="form-check-label">Active in the classifier</span>
+                  </label>
+                  <button type="submit" class="sd-btn sd-btn-primary">
+                    <i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save category</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5">
+            <div class="sd-report-empty">
+              <i class="fas fa-tags" aria-hidden="true"></i>
+              <strong>No categories yet</strong>
+              <span>Load the built-in category model or add your first category to begin.</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal modal-blur fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_category" />
+        <div class="modal-header">
+          <h2 class="modal-title" id="addCategoryModalLabel">Add category</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="sd-detail-grid" style="margin-top: 0;">
+            <div>
+              <label class="form-label" for="new-category-name">Name</label>
+              <input type="text" class="form-control" id="new-category-name" name="name" placeholder="e.g. Health" required />
+            </div>
+            <div>
+              <label class="form-label" for="new-category-description">Description</label>
+              <input type="text" class="form-control" id="new-category-description" name="description" placeholder="What belongs in this category?" />
+            </div>
+          </div>
+          <div style="margin-top: 14px;">
+            <label class="form-label" for="new-category-keywords">Keywords</label>
+            <textarea class="form-control" id="new-category-keywords" name="keywords" rows="3" placeholder="nurse*, clinic*, medicine*, sick*, injury*"></textarea>
+            <div class="form-hint">Separate keywords or phrases with commas. Add <code>*</code> to the end of a word to match its beginning (for example, <code>harass*</code>).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="sd-btn sd-btn-soft" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="sd-btn sd-btn-primary">
+            <i class="fas fa-plus" aria-hidden="true"></i><span>Add category</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

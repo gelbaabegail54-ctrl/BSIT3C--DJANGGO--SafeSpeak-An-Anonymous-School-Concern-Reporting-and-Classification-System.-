@@ -1,0 +1,168 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}<i class="fas fa-circle-question" aria-hidden="true"></i>Support{% endblock %}
+{% block page_title %}Help &amp; <em>resources</em>{% endblock %}
+{% block page_subtitle %}Support options, reporting guidance, and answers to common questions about how SafeSpeak works.{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">
+  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>Report a concern</span>
+</a>
+<a href="{% url 'privacy_guidelines' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-user-shield" aria-hidden="true"></i><span>Privacy</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-callout" role="alert">
+  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+  <div>
+    <strong>If you need support right now</strong>
+    <p>SafeSpeak is not an emergency service and reports are not monitored around the clock. If you or someone else is in immediate danger, call <strong>911</strong> or your local emergency hotline, contact campus security or the school office, or reach out to a guidance counselor, teacher, family member, or another trusted adult. Do not wait for a response here.</p>
+  </div>
+</section>
+
+<div class="sd-grid">
+  <div class="sd-col-8">
+    <section class="sd-card" aria-labelledby="how-it-works-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="how-it-works-title">How SafeSpeak works</h2>
+          <p class="sd-card-sub">Three calm steps from speaking up to hearing back.</p>
+        </div>
+        <span class="sd-badge"><i class="fas fa-seedling" aria-hidden="true"></i>Simple by design</span>
+      </div>
+
+      <div class="sd-support-steps">
+        <div class="sd-support-step">
+          <span class="sd-support-step-number">1</span>
+          <strong>Submit</strong>
+          <p>Share a concern or confession. Reports are anonymous by default, and you can attach images if they help explain the situation.</p>
+        </div>
+        <div class="sd-support-step">
+          <span class="sd-support-step-number">2</span>
+          <strong>Review</strong>
+          <p>The SafeSpeak team reviews the report, checks its category, and decides what action or referral is needed.</p>
+        </div>
+        <div class="sd-support-step">
+          <span class="sd-support-step-number">3</span>
+          <strong>Respond</strong>
+          <p>If you linked the report to your account, you can follow status changes and read administrator responses in My Reports.</p>
+        </div>
+      </div>
+
+      <div class="sd-note" style="margin-top: 14px;" role="note">
+        <i class="fas fa-user-secret" aria-hidden="true"></i>
+        <div>Unlinked reports stay anonymous and cannot be matched to your account later. Account linking is always optional.</div>
+      </div>
+    </section>
+
+    <section class="sd-card sd-faq-card" aria-labelledby="faq-title" style="margin-top: 16px;">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="faq-title">Frequently asked questions</h2>
+          <p class="sd-card-sub">The things students ask us most often.</p>
+        </div>
+      </div>
+
+      <div class="accordion" id="helpFaq">
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="helpFaqOneHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpFaqOne" aria-expanded="false" aria-controls="helpFaqOne">
+              Will anyone know who submitted a report?
+            </button>
+          </h3>
+          <div id="helpFaqOne" class="accordion-collapse collapse" aria-labelledby="helpFaqOneHeading" data-bs-parent="#helpFaq">
+            <div class="accordion-body">
+              Reports and comments are displayed as anonymous. If you choose to link a report to your account, administrators can see that the report came from your account. If you do not link it, the report cannot be matched to you later.
+            </div>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="helpFaqTwoHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpFaqTwo" aria-expanded="false" aria-controls="helpFaqTwo">
+              What happens after I submit?
+            </button>
+          </h3>
+          <div id="helpFaqTwo" class="accordion-collapse collapse" aria-labelledby="helpFaqTwoHeading" data-bs-parent="#helpFaq">
+            <div class="accordion-body">
+              The report appears in the review queue for the SafeSpeak team. Its status moves from Submitted to Under Review, In Progress, and then Resolved or Dismissed. Linked reports show these updates in My Reports.
+            </div>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="helpFaqThreeHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpFaqThree" aria-expanded="false" aria-controls="helpFaqThree">
+              Can I attach photos?
+            </button>
+          </h3>
+          <div id="helpFaqThree" class="accordion-collapse collapse" aria-labelledby="helpFaqThreeHeading" data-bs-parent="#helpFaq">
+            <div class="accordion-body">
+              Yes. You can attach up to three JPG, PNG, or WebP images to a concern or confession, with a maximum of 5 MB each. Avoid images that show faces, ID cards, or other details that could identify you or someone else.
+            </div>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3 class="accordion-header" id="helpFaqFourHeading">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpFaqFour" aria-expanded="false" aria-controls="helpFaqFour">
+              Can I edit or delete a report?
+            </button>
+          </h3>
+          <div id="helpFaqFour" class="accordion-collapse collapse" aria-labelledby="helpFaqFourHeading" data-bs-parent="#helpFaq">
+            <div class="accordion-body">
+              Reports cannot be edited or deleted from the site after they are submitted. You can edit or delete your own comments. If a report contains information that should be removed, contact a school administrator.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="sd-col-4">
+    <section class="sd-card" aria-labelledby="quick-actions-title">
+      <div class="sd-card-head">
+        <h2 class="sd-card-title" id="quick-actions-title">Quick actions</h2>
+      </div>
+      <div class="sd-detail-actions">
+        <a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">
+          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>Report a concern</span>
+        </a>
+        <a href="{% url 'submit_confession' %}" class="sd-btn sd-btn-soft">
+          <i class="fas fa-comment-dots" aria-hidden="true"></i><span>Share a confession</span>
+        </a>
+        <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
+          <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>View my reports</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="school-support-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="school-support-title"><i class="fas fa-school" aria-hidden="true"></i>School support</h2>
+      <p>Where to go on campus when you need to talk to someone:</p>
+      <dl class="sd-meta-list">
+        <div class="sd-meta-row">
+          <dt>Guidance office</dt>
+          <dd>Counseling and mental health support</dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Campus security</dt>
+          <dd>Immediate safety concerns</dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Trusted adult</dt>
+          <dd>A teacher, adviser, coach, or family member</dd>
+        </div>
+      </dl>
+      <p style="margin-top: 11px;">Contact details and office hours are provided by your school. If an office is closed, use the emergency options at the top of this page.</p>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="privacy-link-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="privacy-link-title"><i class="fas fa-user-shield" aria-hidden="true"></i>Privacy &amp; guidelines</h2>
+      <p>Learn how anonymity works, what administrators can see, and what is expected when posting and commenting.</p>
+      <a href="{% url 'privacy_guidelines' %}" class="sd-btn sd-btn-soft">
+        <i class="fas fa-arrow-right" aria-hidden="true"></i><span>Read privacy &amp; guidelines</span>
+      </a>
+    </section>
+  </aside>
+</div>
+{% endblock %}

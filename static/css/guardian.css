@@ -530,28 +530,6 @@
   border-bottom: 0;
 }
 
-.gs-ticket {
-  display: block;
-  color: var(--gs-primary);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.015em;
-  text-decoration: none;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.gs-ticket:hover {
-  text-decoration: underline;
-}
-
-.gs-ticket-sub {
-  display: block;
-  margin-top: 0.12rem;
-  color: var(--gs-muted);
-  font-size: 10.5px;
-}
-
 .gs-report-title {
   max-width: 34ch;
   overflow: hidden;
@@ -642,6 +620,51 @@
 .gs-status--dismissed {
   background: rgba(214, 69, 69, 0.09);
   color: #b91c1c;
+}
+
+.gs-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gs-action i {
+  font-size: 9.5px;
+}
+
+.gs-action--status {
+  background: rgba(14, 143, 168, 0.1);
+  color: #0e7490;
+}
+
+.gs-action--response {
+  background: rgba(79, 70, 229, 0.09);
+  color: #4338ca;
+}
+
+.gs-action--note {
+  background: rgba(199, 122, 10, 0.1);
+  color: #a16207;
+}
+
+.gs-action--comment {
+  background: rgba(14, 143, 168, 0.1);
+  color: #0e7490;
+}
+
+.gs-action--user {
+  background: rgba(124, 58, 237, 0.09);
+  color: #6d28d9;
+}
+
+.gs-action--auth {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
 }
 
 .gs-priority {
@@ -801,6 +824,36 @@
 [data-bs-theme="dark"] .gs-status--dismissed {
   background: rgba(251, 113, 133, 0.12);
   color: #fda4af;
+}
+
+[data-bs-theme="dark"] .gs-action--status {
+  background: rgba(34, 211, 238, 0.12);
+  color: #67e8f9;
+}
+
+[data-bs-theme="dark"] .gs-action--response {
+  background: rgba(129, 140, 248, 0.14);
+  color: #c7d2fe;
+}
+
+[data-bs-theme="dark"] .gs-action--note {
+  background: rgba(251, 191, 36, 0.13);
+  color: #fcd34d;
+}
+
+[data-bs-theme="dark"] .gs-action--comment {
+  background: rgba(34, 211, 238, 0.12);
+  color: #67e8f9;
+}
+
+[data-bs-theme="dark"] .gs-action--user {
+  background: rgba(167, 139, 250, 0.14);
+  color: #ddd6fe;
+}
+
+[data-bs-theme="dark"] .gs-action--auth {
+  background: rgba(148, 163, 184, 0.14);
+  color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .gs-priority--urgent {

@@ -1,0 +1,59 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>{% block auth_title %}SafeSpeak{% endblock %}</title>
+  <link rel="icon" href="{% static 'favicon-dev.ico' %}" type="image/x-icon" />
+  <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-themes.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/sage-dashboard.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/sage-features.css' %}" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>@import url("https://rsms.me/inter/inter.css");</style>
+</head>
+<body class="sd-body sd-auth-body">
+  <div class="sd-auth-shell">
+    <aside class="sd-auth-brand" aria-label="About SafeSpeak">
+      <a class="sd-brand sd-auth-logo" href="{% url 'login' %}">
+        <span class="sd-brand-mark"><i class="fas fa-shield-heart" aria-hidden="true"></i></span>
+        <span class="sd-brand-text">
+          <span class="sd-brand-name">SafeSpeak</span>
+          <span class="sd-brand-sub">Safe school reporting</span>
+        </span>
+      </a>
+
+      <div class="sd-auth-brand-copy">
+        <span class="sd-eyebrow"><i class="fas fa-seedling" aria-hidden="true"></i>A calmer way to speak up</span>
+        <h1>Your voice matters.<br><em>Your identity stays yours.</em></h1>
+        <p>Share a concern or confession with the SafeSpeak team, follow how it moves forward, and find the support you need.</p>
+        <ul class="sd-auth-points">
+          <li><span><i class="fas fa-user-secret" aria-hidden="true"></i></span><div><strong>Anonymous by default</strong><small>Reports are never tied to your account unless you choose to link them.</small></div></li>
+          <li><span><i class="fas fa-lock" aria-hidden="true"></i></span><div><strong>Private and protected</strong><small>Only authorized administrators can review reports and responses.</small></div></li>
+          <li><span><i class="fas fa-hand-holding-heart" aria-hidden="true"></i></span><div><strong>Support that follows through</strong><small>Track progress and read replies from the SafeSpeak team in one place.</small></div></li>
+        </ul>
+      </div>
+
+      <div class="sd-auth-safety">
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <span>In an emergency, call your local emergency number or contact campus security right away.</span>
+      </div>
+    </aside>
+
+    <main class="sd-auth-main">
+      <div class="sd-auth-card">
+        {% block auth_card %}{% endblock %}
+      </div>
+      <p class="sd-auth-footnote">
+        <i class="fas fa-shield-heart" aria-hidden="true"></i>
+        SafeSpeak is a school reporting tool, not an emergency service.
+      </p>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+  {% block auth_js %}{% endblock %}
+</body>
+</html>

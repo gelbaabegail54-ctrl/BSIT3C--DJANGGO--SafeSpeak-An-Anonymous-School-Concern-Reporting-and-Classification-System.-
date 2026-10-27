@@ -1,9 +1,8 @@
 {% load static %}
-<div class="table-responsive">
-  <table class="table gs-table">
+<div class="sd-table-wrap">
+  <table class="table sd-table">
     <thead>
       <tr>
-        <th>Ticket</th>
         <th>Report</th>
         <th>Status</th>
         <th>Priority</th>
@@ -15,55 +14,51 @@
       {% for report in reports %}
       <tr>
         <td>
-          <a href="{% url 'admin_report_detail' kind report.pk %}" class="gs-ticket" title="{{ report.ticket_number }}">
-            {{ report.ticket_number|truncatechars:13 }}
-          </a>
-        </td>
-        <td>
-          <div class="gs-report-title" title="{{ report.title }}">{{ report.title|truncatechars:52 }}</div>
-          <div class="gs-report-meta">
-            <span class="gs-type">
-              <span class="gs-type-icon {% if kind == 'concern' %}is-concern{% else %}is-confession{% endif %}">
-                <i class="fas {% if kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}"></i>
-              </span>
-              {{ type_label }}
+          <div class="sd-report-cell">
+            <span class="sd-report-cell-icon {% if kind == 'confession' %}is-confession{% endif %}">
+              <i class="fas {% if kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
             </span>
-            {% if report.category %}
-            <span aria-hidden="true">&middot;</span>
-            <span>{{ report.category.name }}</span>
-            {% endif %}
+            <div class="sd-report-cell-body">
+              <a href="{% url 'admin_report_detail' kind report.pk %}" class="sd-report-cell-title" title="{{ report.title }}">{{ report.title|truncatechars:52 }}</a>
+              <div class="sd-report-cell-meta">
+                <span>{{ type_label }}</span>
+                {% if report.category %}
+                <span aria-hidden="true">&middot;</span>
+                <span>{{ report.category.name }}</span>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </td>
         <td>
-          <span class="gs-status {% if report.status == 'RESOLVED' %}gs-status--resolved{% elif report.status == 'DISMISSED' %}gs-status--dismissed{% elif report.status == 'IN_PROGRESS' %}gs-status--progress{% elif report.status == 'UNDER_REVIEW' %}gs-status--review{% else %}gs-status--submitted{% endif %}">
-            <span class="gs-status-dot" aria-hidden="true"></span>
+          <span class="sd-status-pill {% if report.status == 'RESOLVED' %}is-resolved{% elif report.status == 'DISMISSED' %}is-dismissed{% elif report.status == 'IN_PROGRESS' %}is-progress{% elif report.status == 'UNDER_REVIEW' %}is-review{% else %}is-submitted{% endif %}">
             {{ report.get_status_display }}
           </span>
         </td>
         <td>
           {% if report.is_urgent %}
-          <span class="gs-priority gs-priority--urgent"><i class="fas fa-bolt" aria-hidden="true"></i> Urgent</span>
+          <span class="sd-priority is-urgent"><i class="fas fa-bolt" aria-hidden="true"></i> Urgent</span>
           {% else %}
-          <span class="gs-priority">Normal</span>
+          <span class="sd-priority">Normal</span>
           {% endif %}
         </td>
         <td>
-          <span class="gs-date-cell">{{ report.submitted_at|date:"M j, Y" }}</span>
-          <span class="gs-time">{{ report.submitted_at|date:"g:i A" }}</span>
+          <span class="sd-date-cell">{{ report.submitted_at|date:"M j, Y" }}</span>
+          <span class="sd-time-cell">{{ report.submitted_at|date:"g:i A" }}</span>
         </td>
         <td>
-          <a href="{% url 'admin_report_detail' kind report.pk %}" class="gs-row-action" title="Open {{ type_label|lower }}" aria-label="Open {{ type_label|lower }} {{ report.ticket_number }}">
+          <a href="{% url 'admin_report_detail' kind report.pk %}" class="sd-row-action" title="Open {{ type_label|lower }}" aria-label="Open {{ type_label|lower }}">
             <i class="fas fa-arrow-right" aria-hidden="true"></i>
           </a>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6">
-          <div class="gs-empty">
-            <span class="gs-empty-icon"><i class="fas fa-inbox" aria-hidden="true"></i></span>
-            <h3 class="gs-empty-title">No {{ type_label|lower }}s match these filters</h3>
-            <p class="gs-empty-text">Try a different status, category, or search term.</p>
+        <td colspan="5">
+          <div class="sd-empty">
+            <span class="sd-empty-icon"><i class="fas fa-inbox" aria-hidden="true"></i></span>
+            <h3 class="sd-empty-title">No {{ type_label|lower }}s match these filters</h3>
+            <p class="sd-empty-text">Try a different status, category, or search term.</p>
           </div>
         </td>
       </tr>

@@ -6,6 +6,7 @@ app_name = 'users'
 urlpatterns = [
     # Page
     path('', views.user_list_page, name='user_list'),
+    path('<int:pk>/history/', views.user_history_page, name='user_history'),
     # AJAX
     path('ajax/list/', views.user_list_ajax, name='user_list_ajax'),
     path('ajax/get/<int:pk>/', views.user_get_ajax, name='user_get_ajax'),

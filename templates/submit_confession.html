@@ -1,85 +1,164 @@
-{% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <title>
-    Submit Confession - SafeSpeak
-  </title>
-  <link href="{% static 'libs/jsvectormap/dist/jsvectormap.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-flags.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-socials.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-payments.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-vendors.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-marketing.css' %}" rel="stylesheet" />
-  <link href="{% static 'css/tabler-themes.css' %}" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
+{% extends "theme/sage_page_base.html" %}
 
-<body>
-  <script src="{% static 'js/tabler-theme.js' %}"></script>
-  <div class="page page-center">
-    <div class="container container-tight py-4">
+{% block page_eyebrow %}<i class="fas fa-comment-dots" aria-hidden="true"></i>Share a confession{% endblock %}
+{% block page_title %}A little lighter, <em>together</em>{% endblock %}
+{% block page_subtitle %}Share something you are proud of, something you are carrying, or a small win. Your confession is anonymous by default.{% endblock %}
 
-      <div class="card card-md">
-        <div class="card-body">
+{% block page_actions %}
+<span class="sd-badge is-muted"><i class="fas fa-lock" aria-hidden="true"></i>Anonymous by default</span>
+{% if user.is_authenticated %}
+<a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>My reports</span>
+</a>
+{% endif %}
+{% endblock %}
 
-          <center class="mt-n4">
-            <i class='fas fa-heart' style='font-size:40px; color:#e83e8c'></i>
-          </center>
-          <h2 class="h3 text-center mb-4">Submit Anonymous Confession</h2>
+{% block page_content %}
+{% if not submission_successful %}{% include 'theme/emergency_banner.html' %}{% endif %}
 
-          {% if messages %}
-          {% for message in messages %}
-          <div id="error-message" class="alert alert-danger">
-            {{ message }}
-          </div>
-          {% endfor %}
-          {% endif %}
-
-          {% if submission_successful %}
-          <div class="alert alert-success mt-3" role="alert">
-            <i class="fas fa-check-circle me-2"></i>
-            <strong>Thank you!</strong> Your confession has been submitted anonymously.<br>
-            <strong>Ticket number:</strong> {{ ticket_number }}<br>
-            Keep this ticket number for updates on your confession.
-          </div>
-          <br>
-          <a href="{% url 'login' %}" class="btn btn-primary">Login to check status</a>
-          {% else %}
-          <form method="post" action="{% url 'submit_confession' %}">
-            {% csrf_token %}
-
-            <div class="mb-3">
-              <label class="form-label required">Confession</label>
-              <textarea class="form-control" name="description" rows="5" placeholder="Share your confession anonymously..." required></textarea>
-            </div>
-
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" name="is_urgent" id="is_urgent">
-              <label class="form-check-label" for="is_urgent">
-                Mark as urgent
-              </label>
-            </div>
-
-            <div class="mt-4">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-paper-plane me-2"></i>Submit Anonymous Confession
-              </button>
-            </div>
-          </form>
-          {% endif %}
-
-        </div>
+{% if submission_successful %}
+<section class="sd-success-card">
+  <span class="sd-success-icon"><i class="fas fa-heart" aria-hidden="true"></i></span>
+  <h2>Confession shared</h2>
+  {% if linked_to_account %}
+  <p><strong>Thank you for sharing.</strong> Your confession has been submitted and linked to your account. You can follow its progress and read responses from the SafeSpeak team in My Reports.</p>
+  <div class="sd-success-actions">
+    <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-primary">
+      <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>View my reports</span>
+    </a>
+    <a href="{% url 'submit_confession' %}" class="sd-btn sd-btn-soft">
+      <i class="fas fa-plus" aria-hidden="true"></i><span>Share another confession</span>
+    </a>
+  </div>
+  {% else %}
+  <p><strong>Thank you for sharing.</strong> Your confession has been submitted anonymously. Because it is not linked to an account, it cannot be matched to you later. To track a future confession, sign in and choose the account link option before submitting.</p>
+  <div class="sd-note" style="text-align: left; margin-bottom: 18px;">
+    <i class="fas fa-user-secret" aria-hidden="true"></i>
+    <div>This confession stays anonymous. Keep this in mind if you want to add follow-up information later.</div>
+  </div>
+  <div class="sd-success-actions">
+    {% if user.is_authenticated %}
+    <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
+      <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>Go to My Reports</span>
+    </a>
+    {% else %}
+    <a href="{% url 'login' %}?next={% url 'submit_confession' %}" class="sd-btn sd-btn-primary">
+      <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i><span>Sign in for tracked reports</span>
+    </a>
+    {% endif %}
+    <a href="{% url 'submit_confession' %}" class="sd-btn sd-btn-soft">
+      <i class="fas fa-plus" aria-hidden="true"></i><span>Share another confession</span>
+    </a>
+  </div>
+  {% endif %}
+</section>
+{% else %}
+<div class="sd-form-layout">
+  <section class="sd-form-card" aria-labelledby="confession-form-title">
+    <div class="sd-form-card-head">
+      <span class="sd-report-kind is-confession"><i class="fas fa-comment-dots" aria-hidden="true"></i></span>
+      <div>
+        <h2 class="sd-form-card-title" id="confession-form-title">Share what is on your mind</h2>
+        <p class="sd-form-card-sub">There is no right way to say it. Write what feels true for you.</p>
       </div>
     </div>
 
-    {% include 'theme/settings.html' %}
-    <script src="{% static 'js/tabler.js' %}" defer></script>
-    <script src="{% static 'js/demo.js' %}" defer></script>
-  </div>
-</body>
-</html>
+    <form method="post" action="{% url 'submit_confession' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="sd-form-section">
+        <label class="form-label required" for="confession-description">Confession</label>
+        <textarea class="form-control" id="confession-description" name="description" rows="7" placeholder="Share your confession anonymously. A worry, a win, a thought you have been carrying..." required>{{ form_description|default:'' }}</textarea>
+        <div class="form-text">Avoid names or personal details that could identify you or someone else unless they are necessary to understand your story.</div>
+      </div>
+
+      <div class="sd-form-section">
+        <label class="form-label" for="images">Attach images <span class="text-muted fw-normal">(optional)</span></label>
+        <div class="sd-upload-box">
+          <input class="form-control" type="file" name="images" id="images" accept="image/jpeg,image/png,image/webp" multiple>
+          <div class="form-text">Up to {{ max_images }} images, 5 MB each. JPG, PNG, or WebP. Avoid photos that reveal your identity.</div>
+          <div id="image-preview" class="d-flex flex-wrap gap-2 mt-2" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="sd-form-section">
+        <label class="sd-check-card" for="is_urgent">
+          <span class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="is_urgent" id="is_urgent" {% if form_is_urgent %}checked{% endif %}>
+          </span>
+          <span>
+            <strong style="display: block; color: var(--sd-ink-soft); font-size: 11px;">Mark as urgent</strong>
+            <span class="form-text" style="margin-top: 2px;">Use this only when someone may be in immediate danger or the situation needs quick attention.</span>
+          </span>
+        </label>
+      </div>
+
+      {% if user.is_authenticated %}
+      <div class="sd-form-section">
+        <h3 class="sd-form-section-title"><i class="fas fa-link" aria-hidden="true"></i>Tracking</h3>
+        <label class="sd-check-card" for="link_to_account">
+          <span class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="link_to_account" id="link_to_account" {% if form_link_to_account %}checked{% endif %}>
+          </span>
+          <span>
+            <strong style="display: block; color: var(--sd-ink-soft); font-size: 11px;">Link this confession to my account</strong>
+            <span class="form-text" style="margin-top: 2px;">Optional. Linked confessions appear in My Reports so you can track their status and read responses. Administrators will be able to see that the confession came from your account.</span>
+          </span>
+        </label>
+      </div>
+      {% else %}
+      <div class="sd-form-section">
+        <div class="sd-note">
+          <i class="fas fa-user-secret" aria-hidden="true"></i>
+          <div>
+            This confession will be submitted anonymously.
+            <a href="{% url 'login' %}?next={% url 'submit_confession' %}" style="color: var(--sd-sage-700); font-weight: 700;">Log in before submitting</a>
+            if you want to link it to your account and track it in My Reports.
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="sd-form-actions">
+        <span class="sd-badge is-muted"><i class="fas fa-lock" aria-hidden="true"></i>Encrypted in transit</span>
+        <button type="submit" class="sd-btn sd-btn-primary">
+          <i class="fas fa-paper-plane" aria-hidden="true"></i><span>Submit confession</span>
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <aside class="sd-form-side">
+    <div class="sd-side-card">
+      <h3 class="sd-side-card-title"><i class="fas fa-heart" aria-hidden="true"></i>A gentle reminder</h3>
+      <p>You deserve the same kindness you would offer a friend. Share only what you feel ready to put into words.</p>
+      <ul>
+        <li>You can keep your confession fully anonymous.</li>
+        <li>Linking is optional and can help you follow replies.</li>
+        <li>A trusted adult or the guidance office can offer further support.</li>
+      </ul>
+    </div>
+
+    <div class="sd-side-card">
+      <h3 class="sd-side-card-title"><i class="fas fa-seedling" aria-hidden="true"></i>Small steps count</h3>
+      <p>Confessions can be big news, quiet wins, or something you simply need to release. Every version belongs here.</p>
+      <a href="{% url 'help_resources' %}" class="sd-btn sd-btn-soft">
+        <i class="fas fa-circle-question" aria-hidden="true"></i><span>Find support</span>
+      </a>
+    </div>
+
+    <div class="sd-callout">
+      <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+      <div>
+        <strong>In an emergency</strong>
+        <p>SafeSpeak is not monitored 24/7. Call 911 or your local emergency number, or contact campus security right away.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% include 'theme/image_upload_preview.html' %}
+{% endblock %}

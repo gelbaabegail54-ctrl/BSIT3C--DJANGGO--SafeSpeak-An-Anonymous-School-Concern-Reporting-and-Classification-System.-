@@ -84,7 +84,7 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {
-            # Prevent silent data truncation (e.g. ticket numbers).
+            # Prevent silent data truncation.
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         },
     }

@@ -1,0 +1,32 @@
+{% extends "theme/dashboard_base.html" %}
+
+{% block dashboard_content %}
+<div class="sd-page">
+  <header class="sd-topbar">
+    <div class="sd-topbar-copy">
+      <span class="sd-eyebrow">{% block page_eyebrow %}<i class="fas fa-shield-heart" aria-hidden="true"></i>SafeSpeak{% endblock %}</span>
+      <h1 class="sd-title">{% block page_title %}SafeSpeak{% endblock %}</h1>
+      <p class="sd-subtitle">{% block page_subtitle %}{% endblock %}</p>
+    </div>
+    <div class="sd-topbar-actions">
+      {% block page_actions %}{% endblock %}
+    </div>
+  </header>
+
+  {% block page_messages %}
+  {% if messages %}
+  <div class="sd-messages">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+      <i class="fas {% if message.tags == 'success' %}fa-circle-check{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} alert-icon" aria-hidden="true"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endblock %}
+
+  {% block page_content %}{% endblock %}
+</div>
+{% endblock %}

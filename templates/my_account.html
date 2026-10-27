@@ -1,0 +1,249 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}<i class="fas fa-user-gear" aria-hidden="true"></i>Account{% endblock %}
+{% block page_title %}My <em>account</em>{% endblock %}
+{% block page_subtitle %}Manage your profile, password, and the reports you chose to link to your account.{% endblock %}
+
+{% block page_actions %}
+<span class="sd-badge"><i class="fas fa-user-shield" aria-hidden="true"></i>{{ role_label }}</span>
+<a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>My reports</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-profile-hero" aria-label="Account summary">
+  <span class="sd-avatar">
+    {% if user.avatar %}
+    <img src="{{ user.avatar.url }}" alt="{{ user.username }}">
+    {% else %}
+    {{ user.first_name|default:user.username|first|upper }}
+    {% endif %}
+  </span>
+  <div>
+    <h2 class="sd-profile-hero-name">{{ user.get_full_name|default:user.username }}</h2>
+    <p class="sd-profile-hero-meta">@{{ user.username }} &middot; Member since {{ user.date_joined|date:"F Y" }}</p>
+  </div>
+  <div class="sd-profile-hero-actions">
+    {% if user.is_active %}
+    <span class="sd-badge is-success"><i class="fas fa-circle-check" aria-hidden="true"></i>Active account</span>
+    {% else %}
+    <span class="sd-badge is-danger"><i class="fas fa-circle-xmark" aria-hidden="true"></i>Inactive</span>
+    {% endif %}
+  </div>
+</section>
+
+<div class="sd-grid">
+  <div class="sd-col-7">
+    <section class="sd-form-card" aria-labelledby="profile-details-title">
+      <div class="sd-form-card-head">
+        <span class="sd-report-kind"><i class="fas fa-id-card" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="sd-form-card-title" id="profile-details-title">Profile details</h2>
+          <p class="sd-form-card-sub">These details belong to your account only. They are never shown on reports or comments.</p>
+        </div>
+      </div>
+
+      <div class="sd-form-section">
+        <label class="form-label" for="account-username">Username</label>
+        <input type="text" class="form-control" id="account-username" value="{{ user.username }}" readonly disabled>
+        <div class="form-text">Usernames cannot be changed from this page.</div>
+      </div>
+
+      <form method="post" action="{% url 'my_account' %}" class="sd-form-section">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="profile">
+
+        <div class="sd-detail-grid" style="margin-top: 0;">
+          <div>
+            <label class="form-label" for="id_first_name">First name</label>
+            <input
+              type="text"
+              class="form-control{% if profile_errors.first_name %} is-invalid{% endif %}"
+              id="id_first_name"
+              name="first_name"
+              maxlength="150"
+              value="{{ profile_values.first_name }}"
+            >
+            {% if profile_errors.first_name %}
+            <div class="invalid-feedback">{{ profile_errors.first_name }}</div>
+            {% endif %}
+          </div>
+          <div>
+            <label class="form-label" for="id_last_name">Last name</label>
+            <input
+              type="text"
+              class="form-control{% if profile_errors.last_name %} is-invalid{% endif %}"
+              id="id_last_name"
+              name="last_name"
+              maxlength="150"
+              value="{{ profile_values.last_name }}"
+            >
+            {% if profile_errors.last_name %}
+            <div class="invalid-feedback">{{ profile_errors.last_name }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <label class="form-label" for="id_email">Email address</label>
+          <input
+            type="email"
+            class="form-control{% if profile_errors.email %} is-invalid{% endif %}"
+            id="id_email"
+            name="email"
+            maxlength="254"
+            value="{{ profile_values.email }}"
+            autocomplete="email"
+          >
+          {% if profile_errors.email %}
+          <div class="invalid-feedback">{{ profile_errors.email }}</div>
+          {% endif %}
+          <div class="form-text">Used only for your account. It is not shown in reports or comments.</div>
+        </div>
+
+        <div class="sd-form-actions">
+          <span class="sd-badge is-muted"><i class="fas fa-lock" aria-hidden="true"></i>Private details</span>
+          <button type="submit" class="sd-btn sd-btn-primary">
+            <i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save changes</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="sd-form-card" aria-labelledby="change-password-title" style="margin-top: 16px;">
+      <div class="sd-form-card-head">
+        <span class="sd-report-kind"><i class="fas fa-key" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="sd-form-card-title" id="change-password-title">Change password</h2>
+          <p class="sd-form-card-sub">Use at least eight characters and avoid passwords you use on other sites.</p>
+        </div>
+      </div>
+
+      {% if password_form.non_field_errors %}
+      <div class="sd-auth-error" role="alert">
+        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+        {% for error in password_form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'my_account' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="password">
+
+        <div class="sd-form-section">
+          <label class="form-label" for="{{ password_form.old_password.id_for_label }}">Current password</label>
+          {{ password_form.old_password }}
+          {% for error in password_form.old_password.errors %}
+          <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="sd-detail-grid">
+          <div>
+            <label class="form-label" for="{{ password_form.new_password1.id_for_label }}">New password</label>
+            {{ password_form.new_password1 }}
+            {% for error in password_form.new_password1.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+            <div class="form-text">{{ password_form.new_password1.help_text|safe }}</div>
+          </div>
+          <div>
+            <label class="form-label" for="{{ password_form.new_password2.id_for_label }}">Confirm new password</label>
+            {{ password_form.new_password2 }}
+            {% for error in password_form.new_password2.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="sd-form-actions">
+          <span class="sd-badge is-muted"><i class="fas fa-shield-halved" aria-hidden="true"></i>Session stays signed in</span>
+          <button type="submit" class="sd-btn sd-btn-primary">
+            <i class="fas fa-key" aria-hidden="true"></i><span>Update password</span>
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <aside class="sd-col-5">
+    <section class="sd-card" aria-labelledby="account-overview-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="account-overview-title">Account overview</h2>
+          <p class="sd-card-sub">A quick look at your SafeSpeak activity.</p>
+        </div>
+        <span class="sd-badge"><i class="fas fa-seedling" aria-hidden="true"></i>Growing</span>
+      </div>
+
+      <div class="sd-account-stat-grid">
+        <div class="sd-account-stat">
+          <strong>{{ linked_count }}</strong>
+          <span>Linked</span>
+        </div>
+        <div class="sd-account-stat">
+          <strong>{{ open_count }}</strong>
+          <span>Open</span>
+        </div>
+        <div class="sd-account-stat">
+          <strong>{{ response_count }}</strong>
+          <span>Responses</span>
+        </div>
+      </div>
+
+      <dl class="sd-meta-list">
+        <div class="sd-meta-row">
+          <dt>Role</dt>
+          <dd>{{ role_label }}</dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Email</dt>
+          <dd>{{ user.email|default:"Not set" }}</dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Member since</dt>
+          <dd>{{ user.date_joined|date:"M j, Y" }}</dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Account status</dt>
+          <dd>
+            {% if user.is_active %}
+            <span class="sd-badge is-success">Active</span>
+            {% else %}
+            <span class="sd-badge is-danger">Inactive</span>
+            {% endif %}
+          </dd>
+        </div>
+        <div class="sd-meta-row">
+          <dt>Resolved reports</dt>
+          <dd>{{ resolved_count }}</dd>
+        </div>
+      </dl>
+
+      <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft" style="width: 100%; margin-top: 14px;">
+        <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>View my reports</span>
+      </a>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="privacy-reminder-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="privacy-reminder-title"><i class="fas fa-user-secret" aria-hidden="true"></i>Privacy reminder</h2>
+      <p>Your profile is separate from your reports. Reports stay anonymous unless you choose to link them to your account when submitting.</p>
+      <p>Linking a report lets you track its status and read responses, but it also means administrators can see that the report came from your account.</p>
+      <a href="{% url 'privacy_guidelines' %}" class="sd-btn sd-btn-soft">
+        <i class="fas fa-user-shield" aria-hidden="true"></i><span>Read privacy &amp; guidelines</span>
+      </a>
+    </section>
+
+    <section class="sd-signout-card" style="margin-top: 14px;">
+      <div>
+        <strong>Sign out</strong>
+        <span>End your SafeSpeak session on this device.</span>
+      </div>
+      <a href="{% url 'logout' %}" class="sd-btn sd-btn-soft">
+        <i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Sign out</span>
+      </a>
+    </section>
+  </aside>
+</div>
+{% endblock %}

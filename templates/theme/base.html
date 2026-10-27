@@ -25,7 +25,8 @@
     </style>
   </head>
 
-  <body>
+  <body class="{% block body_class %}{% endblock %}">
+    {% block page_wrapper %}
     <div class="page">
 
         {% if request.user.is_authenticated %}
@@ -34,7 +35,7 @@
 
         <div class="page-wrapper">
             <div class="page-body">
-                <div class="container-xl">
+                <div class="{% block page_container %}container-xl{% endblock %}">
                     {% block content %}
                     {% endblock %}
                 </div>
@@ -42,6 +43,7 @@
             {% include 'theme/footer.html' %}
         </div>
     </div>
+    {% endblock %}
    
     {% include 'theme/settings.html' %}
 

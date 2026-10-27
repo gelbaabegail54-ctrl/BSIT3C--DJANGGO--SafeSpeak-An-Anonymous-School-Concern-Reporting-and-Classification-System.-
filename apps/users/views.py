@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -10,8 +10,27 @@ from django.db import IntegrityError
 from django.db.models import Q
 from django.views.decorators.http import require_POST
 
+from apps.core.models import (
+    AdminAction,
+    AdminActivityLog,
+    Concern,
+    Confession,
+    ReportComment,
+)
 
-VALID_ROLES = {'instructor', 'staff', 'admin'}
+
+VALID_ROLES = {'admin', 'user'}
+ROLE_LABELS = {'admin': 'Administrator', 'user': 'User'}
+
+
+def _log_user_activity(actor, action, detail, target_user=None):
+    """Record a user-management action in the activity log."""
+    return AdminActivityLog.objects.create(
+        actor=actor,
+        action=action,
+        detail=detail,
+        target_user=target_user,
+    )
 
 
 def _is_superuser(user):
@@ -19,11 +38,7 @@ def _is_superuser(user):
 
 
 def _user_role(user):
-    if user.is_superuser:
-        return 'admin'
-    if user.is_staff:
-        return 'staff'
-    return 'instructor'
+    return 'admin' if user.is_superuser else 'user'
 
 
 def _other_active_admins(user):
@@ -74,6 +89,83 @@ def user_list_page(request):
     })
 
 
+@login_required(login_url='login')
+@user_passes_test(_is_superuser, login_url='dashboard')
+def user_history_page(request, pk):
+    """Show the activity timeline for a single user account."""
+    history_user = get_object_or_404(User, pk=pk)
+
+    logs = (
+        AdminActivityLog.objects
+        .filter(Q(target_user=history_user) | Q(actor=history_user))
+        .select_related('actor', 'concern', 'confession')
+    )
+    concerns = Concern.objects.filter(submitted_by=history_user).select_related('category')
+    confessions = Confession.objects.filter(submitted_by=history_user).select_related('category')
+    comments = (
+        ReportComment.objects
+        .filter(author=history_user)
+        .select_related('concern', 'confession', 'concern__category', 'confession__category')
+    )
+
+    activity_type = request.GET.get('type', 'all').strip()
+    if activity_type not in ('all', 'account', 'reports', 'comments'):
+        activity_type = 'all'
+
+    account_count = logs.count()
+    report_count = concerns.count() + confessions.count()
+    comment_count = comments.count()
+
+    timeline = []
+    if activity_type in ('all', 'account'):
+        for log in logs:
+            timeline.append({'kind': 'account', 'at': log.created_at, 'log': log})
+
+    if activity_type in ('all', 'reports'):
+        for concern in concerns:
+            timeline.append({
+                'kind': 'report',
+                'at': concern.submitted_at,
+                'report': concern,
+                'report_kind': 'concern',
+            })
+        for confession in confessions:
+            timeline.append({
+                'kind': 'report',
+                'at': confession.submitted_at,
+                'report': confession,
+                'report_kind': 'confession',
+            })
+
+    if activity_type in ('all', 'comments'):
+        for comment in comments:
+            report = comment.concern or comment.confession
+            timeline.append({
+                'kind': 'comment',
+                'at': comment.created_at,
+                'comment': comment,
+                'report': report,
+                'report_kind': 'concern' if comment.concern_id else 'confession',
+            })
+
+    timeline.sort(key=lambda item: item['at'], reverse=True)
+
+    paginator = Paginator(timeline, 20)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    context = {
+        'history_user': history_user,
+        'timeline': page,
+        'page_obj': page,
+        'current_type': activity_type,
+        'account_count': account_count,
+        'report_count': report_count,
+        'comment_count': comment_count,
+        'total_count': account_count + report_count + comment_count,
+    }
+    return render(request, 'users/history.html', context)
+
+
 # LIST USERS (AJAX)
 @login_required(login_url='login')
 @user_passes_test(_is_superuser, login_url='dashboard')
@@ -122,11 +214,14 @@ def user_save_ajax(request):
         user = User()
         is_update = False
 
+    old_role = _user_role(user) if is_update else None
+    old_is_active = user.is_active if is_update else None
+
     username = request.POST.get("username", "").strip()
     first_name = request.POST.get("first_name", "").strip()
     last_name = request.POST.get("last_name", "").strip()
     email = request.POST.get("email", "").strip()
-    role = request.POST.get("role", "instructor").strip().lower()
+    role = request.POST.get("role", "user").strip().lower()
     is_active = request.POST.get("is_active") == "true"
 
     if not username:
@@ -185,7 +280,7 @@ def user_save_ajax(request):
     user.email = email
     user.is_active = is_active
     user.is_superuser = role == 'admin'
-    user.is_staff = role in ('admin', 'staff')
+    user.is_staff = role == 'admin'
 
     try:
         user.save()
@@ -200,6 +295,41 @@ def user_save_ajax(request):
         f'User "{user.username}" has been '
         f'{"updated" if is_update else "created"} successfully.'
     )
+
+    password_changed = bool(password)
+
+    if not is_update:
+        action = AdminAction.USER_CREATED
+        detail = (
+            f'Created user "{user.username}" '
+            f'(role: {ROLE_LABELS.get(role, role)}, {"active" if is_active else "inactive"}).'
+        )
+    elif old_role != role:
+        action = AdminAction.USER_ROLE_CHANGED
+        detail = (
+            f'Changed role for "{user.username}" from '
+            f'{ROLE_LABELS.get(old_role, old_role)} to {ROLE_LABELS.get(role, role)}.'
+        )
+        if old_is_active != is_active:
+            detail += f' Account is now {"active" if is_active else "inactive"}.'
+        if password_changed:
+            detail += ' Password was reset.'
+    elif old_is_active != is_active:
+        action = AdminAction.USER_ACTIVATED if is_active else AdminAction.USER_DEACTIVATED
+        detail = f'{"Activated" if is_active else "Deactivated"} user "{user.username}".'
+        if password_changed:
+            detail += ' Password was reset.'
+    elif password_changed:
+        action = AdminAction.USER_PASSWORD_RESET
+        detail = f'Reset password for user "{user.username}".'
+    else:
+        action = AdminAction.USER_UPDATED
+        detail = (
+            f'Updated user "{user.username}" '
+            f'(role: {ROLE_LABELS.get(role, role)}, {"active" if is_active else "inactive"}).'
+        )
+
+    _log_user_activity(request.user, action, detail, target_user=user)
 
     return JsonResponse({
         "status": "success",
@@ -228,6 +358,13 @@ def user_delete_ajax(request, pk):
         )
 
     username = user.username
+    role = _user_role(user)
+    _log_user_activity(
+        request.user,
+        AdminAction.USER_DELETED,
+        f'Deleted user "{username}" (role: {ROLE_LABELS.get(role, role)}).',
+        target_user=user,
+    )
     user.delete()
     return JsonResponse({
         "status": "deleted",

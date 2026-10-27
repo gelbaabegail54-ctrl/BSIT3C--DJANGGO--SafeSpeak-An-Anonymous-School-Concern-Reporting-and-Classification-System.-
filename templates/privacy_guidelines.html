@@ -1,0 +1,150 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}<i class="fas fa-user-shield" aria-hidden="true"></i>Support{% endblock %}
+{% block page_title %}Privacy &amp; <em>guidelines</em>{% endblock %}
+{% block page_subtitle %}How anonymity works on SafeSpeak, what administrators can see, and how we keep the community respectful.{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'help_resources' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-circle-question" aria-hidden="true"></i><span>Help &amp; resources</span>
+</a>
+<a href="{% url 'my_account' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-user-gear" aria-hidden="true"></i><span>My account</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-note" role="note">
+  <i class="fas fa-user-secret" aria-hidden="true"></i>
+  <div>
+    <strong>Anonymous by default.</strong>
+    Reports and comments are shown as Anonymous. Linking a report to your account is optional and only happens when you choose it before submitting.
+  </div>
+</section>
+
+<div class="sd-grid">
+  <div class="sd-col-7">
+    <section class="sd-card" aria-labelledby="anonymity-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="anonymity-title">How your anonymity works</h2>
+          <p class="sd-card-sub">The choices you make before you press submit.</p>
+        </div>
+        <span class="sd-badge"><i class="fas fa-lock" aria-hidden="true"></i>Protected</span>
+      </div>
+      <ul class="list-clean">
+        <li>
+          <strong>Unlinked reports are anonymous.</strong>
+          They are not connected to your account and cannot be matched to you later, even if you change your mind.
+        </li>
+        <li>
+          <strong>Linking is optional.</strong>
+          If you tick &ldquo;Link this report to my account,&rdquo; the report appears in My Reports so you can track it. Administrators can then see that the report came from your account.
+        </li>
+        <li>
+          <strong>Comments are anonymous.</strong>
+          Your username is not shown on comments. You can edit or delete your own comments, and administrators can moderate them.
+        </li>
+        <li>
+          <strong>Open reports are visible to signed-in users.</strong>
+          The home feed shows report text and images to other signed-in members of the community. Do not include identifying details unless they are necessary.
+        </li>
+        <li>
+          <strong>Be careful with images.</strong>
+          Photos can show faces, uniforms, locations, or personal documents. Only attach images that are needed to explain the report.
+        </li>
+      </ul>
+    </section>
+
+    <section class="sd-card" aria-labelledby="admin-visibility-title" style="margin-top: 16px;">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="admin-visibility-title">What administrators can see</h2>
+          <p class="sd-card-sub">Access stays limited to the people reviewing your report.</p>
+        </div>
+      </div>
+      <p class="sd-note-text">Authorized SafeSpeak administrators can review report text, attached images, status, comments, and the account link when you explicitly chose to link a report. They use this information to review reports, respond to reporters, and decide on next steps.</p>
+      <div class="sd-note" style="margin-top: 12px;">
+        <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+        <div>Internal notes and administrative activity logs are used for case management and are not shown in the community feed.</div>
+      </div>
+    </section>
+
+    <section class="sd-card" aria-labelledby="protect-title" style="margin-top: 16px;">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="protect-title">Protecting yourself and others</h2>
+          <p class="sd-card-sub">Small habits that keep the community safe.</p>
+        </div>
+      </div>
+      <ul class="list-clean">
+        <li>Do not post passwords, ID numbers, home addresses, or other sensitive personal information.</li>
+        <li>Remove names or identifying details when they are not needed to understand the concern.</li>
+        <li>If you are reporting on behalf of someone else, share only what is necessary and respect their privacy.</li>
+        <li>If a report contains information that should be removed, contact a school administrator.</li>
+      </ul>
+    </section>
+  </div>
+
+  <aside class="sd-col-5">
+    <section class="sd-card" aria-labelledby="community-guidelines-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="community-guidelines-title">Community guidelines</h2>
+          <p class="sd-card-sub">What we ask of everyone who speaks up here.</p>
+        </div>
+        <span class="sd-badge is-info"><i class="fas fa-hand-holding-heart" aria-hidden="true"></i>Kindness</span>
+      </div>
+      <ol class="sd-guideline-list">
+        <li>
+          <strong>Be respectful.</strong>
+          No harassment, threats, hate speech, or personal attacks.
+        </li>
+        <li>
+          <strong>Protect privacy.</strong>
+          Do not share names, contact details, or other identifying information about yourself or others.
+        </li>
+        <li>
+          <strong>Report honestly.</strong>
+          Do not submit false reports or deliberately misleading information.
+        </li>
+        <li>
+          <strong>Keep it relevant.</strong>
+          Use comments to discuss the report, not to spam, advertise, or post unrelated content.
+        </li>
+        <li>
+          <strong>Use appropriate images.</strong>
+          No explicit, violent, or unrelated images. Attach only what helps explain the concern.
+        </li>
+      </ol>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="moderation-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="moderation-title"><i class="fas fa-scale-balanced" aria-hidden="true"></i>Moderation</h2>
+      <p>Reports and comments that break these guidelines may be dismissed, removed, or referred to the appropriate school office. Misuse of SafeSpeak may also lead to account restrictions.</p>
+      <p>Reports are reviewed as capacity allows. SafeSpeak is not monitored 24/7 and is not a substitute for emergency services.</p>
+    </section>
+
+    <section class="sd-side-card" aria-labelledby="need-help-title" style="margin-top: 14px;">
+      <h2 class="sd-side-card-title" id="need-help-title"><i class="fas fa-circle-question" aria-hidden="true"></i>Need help?</h2>
+      <p>Find support options, reporting guidance, and answers to common questions.</p>
+      <div class="sd-detail-actions">
+        <a href="{% url 'help_resources' %}" class="sd-btn sd-btn-primary">
+          <i class="fas fa-circle-question" aria-hidden="true"></i><span>Help &amp; resources</span>
+        </a>
+        <a href="{% url 'my_account' %}" class="sd-btn sd-btn-soft">
+          <i class="fas fa-user-gear" aria-hidden="true"></i><span>My account</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="sd-callout" style="margin-top: 14px;">
+      <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+      <div>
+        <strong>In an emergency</strong>
+        <p>Call 911 or your local emergency number, or contact campus security right away. SafeSpeak is not monitored 24/7.</p>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

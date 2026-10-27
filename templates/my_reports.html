@@ -1,0 +1,253 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}<i class="fas fa-clipboard-list" aria-hidden="true"></i>Your workspace{% endblock %}
+{% block page_title %}My <em>reports</em>{% endblock %}
+{% block page_subtitle %}Track the concerns and confessions you chose to link to your account. Follow each step and read replies from the SafeSpeak team.{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">
+  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>Report a concern</span>
+</a>
+<a href="{% url 'submit_confession' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-comment-dots" aria-hidden="true"></i><span>Share a confession</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-note" role="note">
+  <i class="fas fa-shield-halved" aria-hidden="true"></i>
+  <div>
+    <strong>Your privacy is protected.</strong>
+    Only reports you explicitly linked to your account appear here. Reports submitted without linking stay anonymous and cannot be recovered or matched to you later.
+  </div>
+</section>
+
+<section class="sd-kpi-grid" aria-label="Your report summary">
+  <article class="sd-kpi">
+    <span class="sd-kpi-icon"><i class="fas fa-link" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Linked reports</span>
+      <strong class="sd-kpi-value">{{ total_count }}</strong>
+      <span class="sd-kpi-meta">{{ concern_count }} concern{{ concern_count|pluralize }} &middot; {{ confession_count }} confession{{ confession_count|pluralize }}</span>
+    </div>
+    <span class="sd-kpi-chip"><i class="fas fa-lock" aria-hidden="true"></i>Private</span>
+  </article>
+
+  <article class="sd-kpi is-amber">
+    <span class="sd-kpi-icon"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Open</span>
+      <strong class="sd-kpi-value">{{ open_count }}</strong>
+      <span class="sd-kpi-meta">Still being reviewed or actioned</span>
+    </div>
+    <span class="sd-kpi-chip {% if open_count %}is-warn{% endif %}">{% if open_count %}In progress{% else %}Clear{% endif %}</span>
+  </article>
+
+  <article class="sd-kpi is-teal">
+    <span class="sd-kpi-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Resolved</span>
+      <strong class="sd-kpi-value">{{ resolved_count }}</strong>
+      <span class="sd-kpi-meta">Closed with a resolution</span>
+    </div>
+    <span class="sd-kpi-chip"><i class="fas fa-seedling" aria-hidden="true"></i>Growth</span>
+  </article>
+
+  <article class="sd-kpi is-rose">
+    <span class="sd-kpi-icon"><i class="fas fa-reply-all" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Responses</span>
+      <strong class="sd-kpi-value">{{ response_count }}</strong>
+      <span class="sd-kpi-meta">Replies from the SafeSpeak team</span>
+    </div>
+    <span class="sd-kpi-chip"><i class="fas fa-inbox" aria-hidden="true"></i>Inbox</span>
+  </article>
+</section>
+
+<div class="sd-card sd-list-toolbar">
+  <ul class="sd-tabs" role="tablist" aria-label="Filter by report type">
+    <li>
+      <a class="sd-tab {% if current_type == 'all' %}active{% endif %}" href="?type=all{% if current_status %}&amp;status={{ current_status }}{% endif %}" role="tab" aria-selected="{% if current_type == 'all' %}true{% else %}false{% endif %}">
+        All <span class="sd-tab-count">{{ total_count }}</span>
+      </a>
+    </li>
+    <li>
+      <a class="sd-tab {% if current_type == 'concern' %}active{% endif %}" href="?type=concern{% if current_status %}&amp;status={{ current_status }}{% endif %}" role="tab" aria-selected="{% if current_type == 'concern' %}true{% else %}false{% endif %}">
+        Concerns <span class="sd-tab-count">{{ concern_count }}</span>
+      </a>
+    </li>
+    <li>
+      <a class="sd-tab {% if current_type == 'confession' %}active{% endif %}" href="?type=confession{% if current_status %}&amp;status={{ current_status }}{% endif %}" role="tab" aria-selected="{% if current_type == 'confession' %}true{% else %}false{% endif %}">
+        Confessions <span class="sd-tab-count">{{ confession_count }}</span>
+      </a>
+    </li>
+  </ul>
+
+  <form method="get" class="sd-toolbar-form" role="search" aria-label="Filter by status">
+    <input type="hidden" name="type" value="{{ current_type }}">
+    <div>
+      <label class="form-label" for="my-reports-status">Status</label>
+      <select class="form-select" id="my-reports-status" name="status">
+        <option value="">All statuses</option>
+        {% for code, label in status_choices %}
+        <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="sd-btn sd-btn-soft">
+      <i class="fas fa-filter" aria-hidden="true"></i><span>Filter</span>
+    </button>
+    {% if current_status %}
+    <a href="?type={{ current_type }}" class="sd-btn sd-btn-soft" aria-label="Clear status filter"><i class="fas fa-rotate-left" aria-hidden="true"></i></a>
+    {% endif %}
+  </form>
+</div>
+
+{% if reports %}
+<p class="sd-result-count">
+  Showing {{ filtered_count }} report{{ filtered_count|pluralize }}{% if current_status %} with status &ldquo;{% for code, label in status_choices %}{% if code == current_status %}{{ label }}{% endif %}{% endfor %}&rdquo;{% endif %}.
+</p>
+
+<div class="sd-report-stack-page">
+  {% for item in reports %}
+  <article class="sd-report-card" aria-label="{{ item.type_label }}: {{ item.report.title }}">
+    <div class="sd-report-card-head">
+      <div class="sd-report-card-heading">
+        <span class="sd-report-kind {% if item.kind == 'confession' %}is-confession{% endif %}" aria-hidden="true">
+          <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}"></i>
+        </span>
+        <div>
+          <h2 class="sd-report-card-title">{{ item.report.title }}</h2>
+          <div class="sd-report-card-meta">
+            <span>{{ item.type_label }}</span>
+            <span class="dot" aria-hidden="true"></span>
+            <span>{{ item.report.category.name }}</span>
+            {% if item.report.is_urgent %}
+            <span class="sd-badge is-urgent"><i class="fas fa-bolt" aria-hidden="true"></i>Urgent</span>
+            {% endif %}
+            <span class="dot" aria-hidden="true"></span>
+            <span><i class="far fa-paper-plane" aria-hidden="true"></i>Submitted {{ item.report.submitted_at|date:"M j, Y, g:i A" }}</span>
+            <span class="dot" aria-hidden="true"></span>
+            <span><i class="far fa-clock" aria-hidden="true"></i>Updated {{ item.report.updated_at|date:"M j, Y, g:i A" }}</span>
+            {% if item.report.resolved_at %}
+            <span class="dot" aria-hidden="true"></span>
+            <span><i class="fas fa-circle-check" aria-hidden="true"></i>Closed {{ item.report.resolved_at|date:"M j, Y, g:i A" }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="sd-report-card-actions">
+        <span class="sd-status-pill {% if item.report.status == 'RESOLVED' %}is-resolved{% elif item.report.status == 'DISMISSED' %}is-dismissed{% elif item.report.status == 'IN_PROGRESS' %}is-progress{% elif item.report.status == 'UNDER_REVIEW' %}is-review{% else %}is-submitted{% endif %}">
+          {{ item.report.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <div class="sd-report-body">
+      <p class="sd-report-description">{{ item.report.description }}</p>
+
+      {% with report_images=item.report.images.all %}
+      {% if report_images %}
+      <div class="sd-attachment-grid" aria-label="Attached images">
+        {% for image in report_images %}
+        <a class="sd-attachment" href="{{ image.image.url }}" target="_blank" rel="noopener noreferrer" aria-label="Open image attached to this report">
+          <img src="{{ image.image.url }}" alt="Image attached to this report" loading="lazy">
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% if item.report.status != 'DISMISSED' %}
+      <div class="sd-report-progress-row">
+        <div class="sd-progress" role="progressbar" aria-label="Report progress" aria-valuenow="{{ item.progress }}" aria-valuemin="0" aria-valuemax="100">
+          <span style="width: {{ item.progress }}%;{% if item.report.status == 'RESOLVED' %} --bar-color: #5f9470;{% elif item.report.status == 'IN_PROGRESS' %} --bar-color: #6f9c92;{% elif item.report.status == 'UNDER_REVIEW' %} --bar-color: #c9a35a;{% endif %}"></span>
+        </div>
+        <div class="sd-progress-labels">
+          <span class="{% if item.progress >= 25 %}is-reached{% endif %}">Submitted</span>
+          <span class="{% if item.progress >= 50 %}is-reached{% endif %}">Under review</span>
+          <span class="{% if item.progress >= 75 %}is-reached{% endif %}">In progress</span>
+          <span class="{% if item.progress >= 100 %}is-reached{% endif %}">Resolved</span>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if item.response %}
+      <div class="sd-response-panel" role="note">
+        <div class="sd-response-head">
+          <strong><i class="fas fa-reply" aria-hidden="true"></i>Response from SafeSpeak</strong>
+          <span class="sd-badge {% if item.response.is_public %}is-success{% else %}is-muted{% endif %}">
+            {% if item.response.is_public %}Shared publicly{% else %}Visible only to you{% endif %}
+          </span>
+        </div>
+        <p class="sd-response-message">{{ item.response.message }}</p>
+        <div class="sd-response-meta">
+          Responded {{ item.response.created_at|date:"M j, Y, g:i A" }}{% if item.response.responded_by %} by the SafeSpeak team{% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="sd-note" style="margin-top: 14px;">
+        <i class="far fa-clock" aria-hidden="true"></i>
+        <div>No response yet. The SafeSpeak team will update this report as it is reviewed.</div>
+      </div>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+  <p class="sd-result-count">
+    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} reports
+  </p>
+  <ul class="pagination m-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?type={{ current_type }}&amp;page={{ page_obj.previous_page_number }}{% if current_status %}&amp;status={{ current_status }}{% endif %}">
+        <i class="fas fa-chevron-left me-1" aria-hidden="true"></i>Prev
+      </a>
+    </li>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+    <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+      <a class="page-link" href="?type={{ current_type }}&amp;page={{ num }}{% if current_status %}&amp;status={{ current_status }}{% endif %}">{{ num }}</a>
+    </li>
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?type={{ current_type }}&amp;page={{ page_obj.next_page_number }}{% if current_status %}&amp;status={{ current_status }}{% endif %}">
+        Next<i class="fas fa-chevron-right ms-1" aria-hidden="true"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</div>
+{% endif %}
+
+{% else %}
+<section class="sd-card">
+  <div class="sd-report-empty">
+    <i class="fas fa-clipboard-list" aria-hidden="true"></i>
+    {% if total_count %}
+    <strong>No reports match these filters</strong>
+    <span>Try another report type or status to find what you are looking for.</span>
+    <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
+      <i class="fas fa-rotate-left" aria-hidden="true"></i><span>Clear filters</span>
+    </a>
+    {% else %}
+    <strong>No linked reports yet</strong>
+    <span>When you submit a report while signed in, tick &ldquo;Link this report to my account&rdquo; to track its status and read responses here. Reports submitted anonymously will not appear.</span>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>Report a concern</span>
+      </a>
+      <a href="{% url 'submit_confession' %}" class="sd-btn sd-btn-soft">
+        <i class="fas fa-comment-dots" aria-hidden="true"></i><span>Share a confession</span>
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

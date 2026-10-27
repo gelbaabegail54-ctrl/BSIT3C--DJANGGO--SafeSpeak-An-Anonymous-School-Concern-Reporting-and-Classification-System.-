@@ -1,0 +1,254 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}
+<a href="{% url 'users:user_list' %}" class="text-decoration-none" style="color: inherit;">
+  <i class="fas fa-arrow-left" aria-hidden="true"></i>User Management
+</a>
+{% endblock %}
+{% block page_title %}{{ history_user.get_full_name|default:history_user.username }}{% endblock %}
+{% block page_subtitle %}Activity history for @{{ history_user.username }}.{% endblock %}
+
+{% block page_actions %}
+{% if history_user.is_superuser %}
+<span class="sd-badge is-info"><i class="fas fa-shield-halved" aria-hidden="true"></i>Administrator</span>
+{% else %}
+<span class="sd-badge is-muted">User</span>
+{% endif %}
+{% if history_user.is_active %}
+<span class="sd-badge is-success"><i class="fas fa-circle" aria-hidden="true"></i>Active</span>
+{% else %}
+<span class="sd-badge is-danger"><i class="fas fa-circle" aria-hidden="true"></i>Inactive</span>
+{% endif %}
+<a href="{% url 'users:user_list' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-users" aria-hidden="true"></i><span>All users</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-profile-hero" aria-label="User summary">
+  <span class="sd-avatar">
+    {% if history_user.first_name or history_user.last_name %}
+      {{ history_user.first_name|first|upper }}{{ history_user.last_name|first|upper }}
+    {% else %}
+      {{ history_user.username|first|upper }}
+    {% endif %}
+  </span>
+  <div>
+    <h2 class="sd-profile-hero-name">{{ history_user.get_full_name|default:history_user.username }}</h2>
+    <p class="sd-profile-hero-meta">{{ history_user.email|default:"No email on file" }} &middot; Joined {{ history_user.date_joined|date:"M j, Y" }}</p>
+  </div>
+  <div class="sd-profile-hero-actions">
+    <span class="sd-badge is-muted"><i class="fas fa-right-to-bracket" aria-hidden="true"></i>Last sign-in {{ history_user.last_login|date:"M j, Y"|default:"Never" }}</span>
+  </div>
+</section>
+
+<section class="sd-card" aria-label="Account statistics">
+  <div class="sd-account-stat-grid" style="margin: 0;">
+    <div class="sd-account-stat">
+      <strong>{{ report_count }}</strong>
+      <span>Reports submitted</span>
+    </div>
+    <div class="sd-account-stat">
+      <strong>{{ comment_count }}</strong>
+      <span>Comments posted</span>
+    </div>
+    <div class="sd-account-stat">
+      <strong>{{ account_count }}</strong>
+      <span>Account events</span>
+    </div>
+  </div>
+  <dl class="sd-meta-list" style="margin-top: 14px;">
+    <div class="sd-meta-row">
+      <dt>Username</dt>
+      <dd>{{ history_user.username }}</dd>
+    </div>
+    <div class="sd-meta-row">
+      <dt>Joined</dt>
+      <dd>{{ history_user.date_joined|date:"M j, Y H:i" }}</dd>
+    </div>
+    <div class="sd-meta-row">
+      <dt>Last sign-in</dt>
+      <dd>{{ history_user.last_login|date:"M j, Y H:i"|default:"Never" }}</dd>
+    </div>
+  </dl>
+</section>
+
+<div class="sd-card sd-list-toolbar">
+  <ul class="sd-tabs" role="tablist" aria-label="Filter user activity">
+    <li>
+      <a class="sd-tab {% if current_type == 'all' %}active{% endif %}" href="?type=all" role="tab" aria-selected="{% if current_type == 'all' %}true{% else %}false{% endif %}">
+        All <span class="sd-tab-count">{{ total_count }}</span>
+      </a>
+    </li>
+    <li>
+      <a class="sd-tab {% if current_type == 'account' %}active{% endif %}" href="?type=account" role="tab" aria-selected="{% if current_type == 'account' %}true{% else %}false{% endif %}">
+        Account activity <span class="sd-tab-count">{{ account_count }}</span>
+      </a>
+    </li>
+    <li>
+      <a class="sd-tab {% if current_type == 'reports' %}active{% endif %}" href="?type=reports" role="tab" aria-selected="{% if current_type == 'reports' %}true{% else %}false{% endif %}">
+        Reports <span class="sd-tab-count">{{ report_count }}</span>
+      </a>
+    </li>
+    <li>
+      <a class="sd-tab {% if current_type == 'comments' %}active{% endif %}" href="?type=comments" role="tab" aria-selected="{% if current_type == 'comments' %}true{% else %}false{% endif %}">
+        Comments <span class="sd-tab-count">{{ comment_count }}</span>
+      </a>
+    </li>
+  </ul>
+  <p class="sd-result-count">{{ page_obj.paginator.count }} event{{ page_obj.paginator.count|pluralize }}</p>
+</div>
+
+<section class="sd-card" aria-labelledby="user-timeline-title">
+  <div class="sd-card-head">
+    <div>
+      <h2 class="sd-card-title" id="user-timeline-title">
+        {% if current_type == 'account' %}Account activity
+        {% elif current_type == 'reports' %}Submitted reports
+        {% elif current_type == 'comments' %}Posted comments
+        {% else %}Activity timeline
+        {% endif %}
+      </h2>
+      <p class="sd-card-sub">Every recorded action for this account, newest first.</p>
+    </div>
+    <span class="sd-badge"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i>Timeline</span>
+  </div>
+
+  {% if timeline %}
+  <ol class="sd-timeline">
+    {% for item in timeline %}
+    <li class="sd-timeline-item">
+      {% if item.kind == 'account' %}
+      <span class="sd-timeline-icon">
+        <i class="fas {{ item.log.icon }}" aria-hidden="true"></i>
+      </span>
+      <div class="sd-timeline-card">
+        <div class="sd-timeline-head">
+          <strong>{{ item.log.get_action_display }}</strong>
+          <span class="sd-timeline-time"><i class="far fa-clock" aria-hidden="true"></i> {{ item.at|date:"M j, Y H:i" }}</span>
+        </div>
+        <div class="sd-timeline-meta">
+          {% if item.log.actor %}
+            by {% if item.log.actor_id == history_user.pk %}this user{% else %}{{ item.log.actor.username }}{% endif %}
+          {% else %}
+            System
+          {% endif %}
+          {% if item.log.target_user_id == history_user.pk and item.log.actor_id != history_user.pk %}
+          &middot; on this account
+          {% endif %}
+        </div>
+
+        {% if item.log.detail %}
+        <div class="sd-timeline-detail">{{ item.log.detail }}</div>
+        {% endif %}
+
+        {% if item.log.old_value or item.log.new_value %}
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
+          {% if item.log.old_value %}
+          <span class="sd-badge is-muted">{{ item.log.old_value }}</span>
+          {% endif %}
+          {% if item.log.old_value and item.log.new_value %}
+          <i class="fas fa-arrow-right" aria-hidden="true" style="color: var(--sd-muted); font-size: 7px;"></i>
+          {% endif %}
+          {% if item.log.new_value %}
+          <span class="sd-badge">{{ item.log.new_value }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if item.log.report %}
+        <div class="sd-timeline-links">
+          <a href="{% url 'admin_report_detail' item.log.kind item.log.report.pk %}">
+            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>View {{ item.log.kind }}
+          </a>
+        </div>
+        {% endif %}
+      </div>
+
+      {% elif item.kind == 'report' %}
+      <span class="sd-timeline-icon is-report">
+        <i class="fas {% if item.report_kind == 'concern' %}fa-file-circle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
+      </span>
+      <div class="sd-timeline-card">
+        <div class="sd-timeline-head">
+          <strong>{{ item.report_kind|capfirst }} submitted</strong>
+          <span class="sd-timeline-time"><i class="far fa-clock" aria-hidden="true"></i> {{ item.at|date:"M j, Y H:i" }}</span>
+        </div>
+        <div class="sd-timeline-detail">
+          <a href="{% url 'admin_report_detail' item.report_kind item.report.pk %}" style="color: var(--sd-sage-700); font-weight: 700; text-decoration: none;">
+            {{ item.report.title }}
+          </a>
+        </div>
+        <div class="sd-timeline-meta" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+          <span>{{ item.report.category.name }}</span>
+          <span class="sd-status-pill {% if item.report.status == 'RESOLVED' %}is-resolved{% elif item.report.status == 'DISMISSED' %}is-dismissed{% elif item.report.status == 'IN_PROGRESS' %}is-progress{% elif item.report.status == 'UNDER_REVIEW' %}is-review{% else %}is-submitted{% endif %}">
+            {{ item.report.get_status_display }}
+          </span>
+        </div>
+      </div>
+
+      {% elif item.kind == 'comment' %}
+      <span class="sd-timeline-icon is-comment">
+        <i class="fas fa-comment" aria-hidden="true"></i>
+      </span>
+      <div class="sd-timeline-card">
+        <div class="sd-timeline-head">
+          <strong>
+            Comment posted
+            {% if item.comment.is_edited %}
+            <span class="sd-badge is-muted">Edited</span>
+            {% endif %}
+          </strong>
+          <span class="sd-timeline-time"><i class="far fa-clock" aria-hidden="true"></i> {{ item.at|date:"M j, Y H:i" }}</span>
+        </div>
+        <div class="sd-timeline-quote">&ldquo;{{ item.comment.body|truncatechars:300 }}&rdquo;</div>
+        <div class="sd-timeline-meta">
+          on
+          <a href="{% url 'admin_report_detail' item.report_kind item.report.pk %}" style="color: var(--sd-sage-700); font-weight: 700; text-decoration: none;">
+            {{ item.report.title }}
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <div class="sd-report-empty">
+    <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+    <strong>No activity found</strong>
+    <span>This user has no recorded activity for the selected filter.</span>
+    <a href="?type=all" class="sd-btn sd-btn-soft">View all activity</a>
+  </div>
+  {% endif %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--sd-line);">
+    <p class="sd-result-count">
+      Showing <strong>{{ page_obj.start_index }}</strong> to <strong>{{ page_obj.end_index }}</strong> of <strong>{{ page_obj.paginator.count }}</strong> events
+    </p>
+    <ul class="pagination m-0">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?type={{ current_type }}&page={{ page_obj.previous_page_number }}">
+          <i class="fas fa-chevron-left me-1" aria-hidden="true"></i>Prev
+        </a>
+      </li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+      <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+        <a class="page-link" href="?type={{ current_type }}&page={{ num }}">{{ num }}</a>
+      </li>
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?type={{ current_type }}&page={{ page_obj.next_page_number }}">
+          Next<i class="fas fa-chevron-right ms-1" aria-hidden="true"></i>
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

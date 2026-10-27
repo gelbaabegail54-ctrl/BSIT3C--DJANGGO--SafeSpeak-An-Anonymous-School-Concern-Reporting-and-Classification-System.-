@@ -32,6 +32,46 @@
             Menu
           </span>
         </li>
+
+        {% if user.is_superuser %}
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'team_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}" href="{% url 'team_dashboard' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-people-group"></i>
+            </span>
+            <span class="nav-link-title">Team Dashboard</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <span class="dh-nav-section">Management</span>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-shield-halved"></i>
+            </span>
+            <span class="nav-link-title">Manage Reports</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_activity_history' %}active{% endif %}" href="{% url 'admin_activity_history' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-clock-rotate-left"></i>
+            </span>
+            <span class="nav-link-title">Activity history</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.app_name == 'users' %}active{% endif %}" href="{% url 'users:user_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-users"></i>
+            </span>
+            <span class="nav-link-title">Users</span>
+          </a>
+        </li>
+        {% endif %}
+
+        {% if not user.is_superuser %}
         <li class="nav-item mb-1">
           <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
@@ -41,40 +81,40 @@
           </a>
         </li>
 
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'submit_concern' %}active{% endif %}" href="{% url 'submit_concern' %}">
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'my_reports' %}active{% endif %}" href="{% url 'my_reports' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-exclamation-triangle"></i>
+              <i class="nav-icon fas fa-clipboard-list"></i>
             </span>
-            <span class="nav-link-title">Report a Concern</span>
+            <span class="nav-link-title">My Reports</span>
           </a>
         </li>
 
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'submit_confession' %}active{% endif %}" href="{% url 'submit_confession' %}">
+          <span class="dh-nav-section">Support</span>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'help_resources' %}active{% endif %}" href="{% url 'help_resources' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-comment-dots"></i>
+              <i class="nav-icon fas fa-circle-question"></i>
             </span>
-            <span class="nav-link-title">Submit Confession</span>
+            <span class="nav-link-title">Help &amp; resources</span>
           </a>
         </li>
-
-        {% if user.is_superuser %}
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}" href="{% url 'admin_dashboard' %}">
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'privacy_guidelines' %}active{% endif %}" href="{% url 'privacy_guidelines' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-shield-halved"></i>
+              <i class="nav-icon fas fa-user-shield"></i>
             </span>
-            <span class="nav-link-title">Manage Reports</span>
+            <span class="nav-link-title">Privacy &amp; guidelines</span>
           </a>
         </li>
-
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.app_name == 'users' %}active{% endif %}" href="{% url 'users:user_list' %}">
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'my_account' %}active{% endif %}" href="{% url 'my_account' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-users"></i>
+              <i class="nav-icon fas fa-user-gear"></i>
             </span>
-            <span class="nav-link-title">Users</span>
+            <span class="nav-link-title">My account</span>
           </a>
         </li>
         {% endif %}
@@ -92,19 +132,15 @@
 
         <li class="nav-item mt-auto dh-nav-sidebar-footer">
           <div class="dh-user-card">
-            {% if user.is_superuser %}
-            <a href="{% url 'users:user_list' %}" class="d-flex align-items-center gap-2 text-decoration-none text-white min-w-0 w-100" title="Manage users">
-            {% else %}
-            <div class="d-flex align-items-center gap-2 min-w-0 w-100">
-            {% endif %}
+            <a href="{% if user.is_superuser %}{% url 'users:user_list' %}{% else %}{% url 'my_account' %}{% endif %}" class="d-flex align-items-center gap-2 text-decoration-none text-white min-w-0 w-100" title="{% if user.is_superuser %}Manage users{% else %}My account{% endif %}">
               <span class="dh-avatar">{{ user.username|first|upper }}</span>
               <span class="min-w-0 flex-grow-1">
                 <span class="dh-user-name">{{ user.username }}</span>
                 <span class="dh-user-role">
-                  {% if user.is_superuser %}Administrator{% elif user.is_staff %}Staff{% elif user.is_authenticated %}Instructor{% endif %}
+                  {% if user.is_superuser %}Administrator{% elif user.is_authenticated %}User{% endif %}
                 </span>
               </span>
-            {% if user.is_superuser %}</a>{% else %}</div>{% endif %}
+            </a>
             <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout">
               <i class="fas fa-sign-out-alt"></i>
             </a>

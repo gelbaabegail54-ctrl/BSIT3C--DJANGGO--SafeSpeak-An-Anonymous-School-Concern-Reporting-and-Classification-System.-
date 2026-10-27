@@ -1,0 +1,160 @@
+{% extends "theme/base.html" %}
+{% load static %}
+
+{% block body_class %}sd-body{% if user.is_superuser %} sd-admin{% endif %}{% if not user.is_authenticated %} sd-public{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/sage-dashboard.css' %}" rel="stylesheet" />
+<link href="{% static 'css/sage-features.css' %}" rel="stylesheet" />
+{% block dashboard_extra_css %}{% endblock %}
+{% endblock %}
+
+{% block page_wrapper %}
+<div class="{% if user.is_authenticated %}sd-shell{% else %}sd-public-shell{% endif %}">
+  {% if user.is_authenticated %}
+  <aside class="sd-sidebar" aria-label="SafeSpeak navigation">
+    <a class="sd-brand" href="{% if user.is_superuser %}{% url 'team_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
+      <span class="sd-brand-mark"><i class="fas fa-shield-heart" aria-hidden="true"></i></span>
+      <span class="sd-brand-text">
+        <span class="sd-brand-name">SafeSpeak</span>
+        <span class="sd-brand-sub">Safe school reporting</span>
+      </span>
+    </a>
+
+    <div class="sd-profile">
+      <span class="sd-avatar">
+        {% if user.avatar %}
+        <img src="{{ user.avatar.url }}" alt="{{ user.username }}">
+        {% else %}
+        {{ user.first_name|default:user.username|first|upper }}
+        {% endif %}
+      </span>
+      <span class="sd-profile-text">
+        <span class="sd-profile-name">{{ user.get_full_name|default:user.username }}</span>
+        <span class="sd-profile-role">{% if user.is_superuser %}Administrator{% else %}Student{% endif %}</span>
+      </span>
+      <a class="sd-profile-link" href="{% if user.is_superuser %}{% url 'team_management' %}{% else %}{% url 'my_account' %}{% endif %}" aria-label="Account settings">
+        <i class="fas fa-gear" aria-hidden="true"></i>
+      </a>
+    </div>
+
+    <nav class="sd-nav" aria-label="Main navigation">
+      {% if user.is_superuser %}
+      <span class="sd-nav-label">Administration</span>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'team_dashboard' %}active{% endif %}"
+         href="{% url 'team_dashboard' %}"
+         {% if request.resolver_match.url_name == 'team_dashboard' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-table-cells-large" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Overview</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}"
+         href="{% url 'admin_dashboard' %}"
+         {% if request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-folder-open" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Manage reports</span>
+      </a>
+      {% if request.resolver_match.url_name != 'team_dashboard' %}
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'nlp_hub' %}active{% endif %}"
+         href="{% url 'nlp_hub' %}"
+         {% if request.resolver_match.url_name == 'nlp_hub' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+        <span class="nav-link-title">NLP review</span>
+      </a>
+      {% endif %}
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'admin_activity_history' %}active{% endif %}"
+         href="{% url 'admin_activity_history' %}"
+         {% if request.resolver_match.url_name == 'admin_activity_history' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Activity history</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.app_name == 'users' %}active{% endif %}"
+         href="{% url 'users:user_list' %}"
+         {% if request.resolver_match.app_name == 'users' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Users</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'team_management' %}active{% endif %}"
+         href="{% url 'team_management' %}"
+         {% if request.resolver_match.url_name == 'team_management' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Team tools</span>
+      </a>
+      {% else %}
+      <span class="sd-nav-label">Workspace</span>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+         href="{% url 'dashboard' %}"
+         {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-table-cells-large" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Dashboard</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'my_reports' %}active{% endif %}"
+         href="{% url 'my_reports' %}"
+         {% if request.resolver_match.url_name == 'my_reports' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></span>
+        <span class="nav-link-title">My reports</span>
+      </a>
+      <span class="sd-nav-label">Support</span>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'help_resources' %}active{% endif %}"
+         href="{% url 'help_resources' %}"
+         {% if request.resolver_match.url_name == 'help_resources' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-circle-question" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Help &amp; resources</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'privacy_guidelines' %}active{% endif %}"
+         href="{% url 'privacy_guidelines' %}"
+         {% if request.resolver_match.url_name == 'privacy_guidelines' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-user-shield" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Privacy &amp; guidelines</span>
+      </a>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'my_account' %}active{% endif %}"
+         href="{% url 'my_account' %}"
+         {% if request.resolver_match.url_name == 'my_account' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-user-gear" aria-hidden="true"></i></span>
+        <span class="nav-link-title">My account</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sd-sidebar-foot">
+      <div class="sd-privacy-note">
+        <i class="fas fa-lock" aria-hidden="true"></i>
+        <span>
+          <strong>Anonymous by default</strong>
+          Your identity is never attached to a report.
+        </span>
+      </div>
+      <a href="{% url 'logout' %}" class="sd-exit">
+        <span class="nav-link-title">Exit</span>
+        <i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>
+      </a>
+    </div>
+  </aside>
+  {% else %}
+  <header class="sd-public-topbar">
+    <a class="sd-public-brand" href="{% url 'login' %}">
+      <span class="sd-brand-mark"><i class="fas fa-shield-heart" aria-hidden="true"></i></span>
+      <span class="sd-brand-text">
+        <span class="sd-brand-name">SafeSpeak</span>
+        <span class="sd-brand-sub">Safe school reporting</span>
+      </span>
+    </a>
+    <div class="sd-public-actions">
+      <span class="sd-public-anon"><i class="fas fa-lock" aria-hidden="true"></i>Anonymous by default</span>
+      <a href="{% url 'login' %}" class="sd-btn sd-btn-soft">Sign in</a>
+      <a href="{% url 'register' %}" class="sd-btn sd-btn-primary">Create account</a>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="{% if user.is_authenticated %}sd-main{% else %}sd-public-main{% endif %}">
+    {% block dashboard_content %}{% endblock %}
+  </main>
+
+  {% if not user.is_authenticated %}
+  <footer class="sd-public-foot">
+    <span><i class="fas fa-triangle-exclamation" aria-hidden="true"></i>SafeSpeak is not monitored 24/7. In an emergency, call your local emergency number.</span>
+    <a href="{% url 'login' %}">Already have an account? Sign in</a>
+  </footer>
+  {% endif %}
+</div>
+{% endblock %}

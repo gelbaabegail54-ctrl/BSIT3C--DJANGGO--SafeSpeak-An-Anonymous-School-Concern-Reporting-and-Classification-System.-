@@ -1,0 +1,115 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}
+<a href="{% url 'team_dashboard' %}" class="text-decoration-none" style="color: inherit;">
+  <i class="fas fa-arrow-left" aria-hidden="true"></i>Back to Team Dashboard
+</a>
+{% endblock %}
+{% block page_title %}Team <em>tools</em>{% endblock %}
+{% block page_subtitle %}Reports and management tools for SafeSpeak administrators.{% endblock %}
+
+{% block page_actions %}
+<span class="sd-badge is-muted"><i class="far fa-calendar" aria-hidden="true"></i>{% now "D, M j, Y" %}</span>
+<span class="sd-badge"><i class="fas fa-shield-halved" aria-hidden="true"></i>Administrator access</span>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-kpi-grid" aria-label="Management overview">
+  <article class="sd-kpi">
+    <span class="sd-kpi-icon"><i class="fas fa-folder-open" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Open reports</span>
+      <strong class="sd-kpi-value">{{ open_reports }}</strong>
+      <span class="sd-kpi-meta">Waiting for review or action</span>
+    </div>
+  </article>
+  <article class="sd-kpi is-teal">
+    <span class="sd-kpi-icon"><i class="fas fa-file-lines" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Total reports</span>
+      <strong class="sd-kpi-value">{{ total_reports }}</strong>
+      <span class="sd-kpi-meta">Concerns and confessions</span>
+    </div>
+  </article>
+  <article class="sd-kpi is-amber">
+    <span class="sd-kpi-icon"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Activity events</span>
+      <strong class="sd-kpi-value">{{ activity_count }}</strong>
+      <span class="sd-kpi-meta">Recorded across SafeSpeak</span>
+    </div>
+  </article>
+  <article class="sd-kpi is-rose">
+    <span class="sd-kpi-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
+    <div class="sd-kpi-body">
+      <span class="sd-kpi-label">Accounts</span>
+      <strong class="sd-kpi-value">{{ user_count }}</strong>
+      <span class="sd-kpi-meta">{{ nlp_category_count }} active categor{{ nlp_category_count|pluralize:"y,ies" }}</span>
+    </div>
+  </article>
+</section>
+
+<section class="sd-management-grid" aria-label="Management tools">
+  <a href="{{ manage_reports_url }}" class="sd-management-card">
+    <div class="sd-management-top">
+      <span class="sd-management-icon"><i class="fas fa-shield-halved" aria-hidden="true"></i></span>
+      <span class="sd-badge">{{ open_reports }} open</span>
+    </div>
+    <h2>Manage Reports</h2>
+    <p>Review, respond to, and resolve concerns and confessions submitted by the community.</p>
+    <div class="sd-management-foot">
+      <span>{{ total_reports }} report{{ total_reports|pluralize }} total</span>
+      <strong>Open <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
+    </div>
+  </a>
+
+  <a href="{% url 'nlp_hub' %}" class="sd-management-card is-teal">
+    <div class="sd-management-top">
+      <span class="sd-management-icon"><i class="fas fa-brain" aria-hidden="true"></i></span>
+      <span class="sd-badge is-info">{{ nlp_category_count }} categor{{ nlp_category_count|pluralize:"y,ies" }}</span>
+    </div>
+    <h2>NLP categorization hub</h2>
+    <p>Review model confidence, apply suggested categories, and tune the keyword library.</p>
+    <div class="sd-management-foot">
+      <span>Machine-assisted triage</span>
+      <strong>Review <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
+    </div>
+  </a>
+
+  <a href="{% url 'admin_activity_history' %}" class="sd-management-card is-amber">
+    <div class="sd-management-top">
+      <span class="sd-management-icon"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i></span>
+      <span class="sd-badge is-warning">{{ activity_count }} event{{ activity_count|pluralize }}</span>
+    </div>
+    <h2>Activity history</h2>
+    <p>Follow report activity, sign-ins, and account changes across SafeSpeak.</p>
+    <div class="sd-management-foot">
+      <span>Chronological history</span>
+      <strong>View <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
+    </div>
+  </a>
+
+  {% if can_manage_users %}
+  <a href="{% url 'users:user_list' %}" class="sd-management-card is-rose">
+    <div class="sd-management-top">
+      <span class="sd-management-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
+      <span class="sd-badge is-danger">{{ user_count }} account{{ user_count|pluralize }}</span>
+    </div>
+    <h2>Users</h2>
+    <p>Create accounts, assign Administrator or User roles, and manage access to SafeSpeak.</p>
+    <div class="sd-management-foot">
+      <span>Administrator access</span>
+      <strong>Manage <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
+    </div>
+  </a>
+  {% endif %}
+</section>
+
+<section class="sd-note" role="note">
+  <i class="fas fa-shield-heart" aria-hidden="true"></i>
+  <div>
+    <strong>Handle every report with care.</strong>
+    These tools are limited to SafeSpeak administrators. Only review reports and account details when you need them to support a student or keep the school community safe.
+  </div>
+</section>
+{% endblock %}

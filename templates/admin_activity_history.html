@@ -1,0 +1,181 @@
+{% extends "theme/sage_page_base.html" %}
+
+{% block page_eyebrow %}<i class="fas fa-clock-rotate-left" aria-hidden="true"></i>Management{% endblock %}
+{% block page_title %}Activity <em>history</em>{% endblock %}
+{% block page_subtitle %}Chronological audit trail of report and account activity across SafeSpeak.{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'users:user_list' %}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-users" aria-hidden="true"></i><span>Manage users</span>
+</a>
+<a href="{{ back_url }}" class="sd-btn sd-btn-soft">
+  <i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to management</span>
+</a>
+{% endblock %}
+
+{% block page_content %}
+<section class="sd-card sd-list-toolbar" aria-label="Filter activity">
+  <form method="get" class="sd-toolbar-form" role="search" style="width: 100%;">
+    <div style="flex: 1 1 240px; max-width: 420px;">
+      <label class="form-label" for="activity-search-input">Search</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="fas fa-search" aria-hidden="true"></i></span>
+        <input type="search" id="activity-search-input" name="q" value="{{ query }}" class="form-control" placeholder="User, title, or detail">
+      </div>
+    </div>
+
+    <div style="flex: 0 1 230px;">
+      <label class="form-label" for="activity-action-filter">Action</label>
+      <select name="action" id="activity-action-filter" class="form-select">
+        <option value="">All actions</option>
+        {% for code, label in action_choices %}
+        <option value="{{ code }}" {% if current_action == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sd-toolbar-actions">
+      <button type="submit" class="sd-btn sd-btn-primary">
+        <i class="fas fa-sliders" aria-hidden="true"></i><span>Apply</span>
+      </button>
+      <a href="{% url 'admin_activity_history' %}" class="sd-btn sd-btn-soft" title="Reset filters" aria-label="Reset filters">
+        <i class="fas fa-rotate-left" aria-hidden="true"></i>
+      </a>
+    </div>
+  </form>
+
+  {% if query or current_action %}
+  <div class="sd-note" style="width: 100%;">
+    <i class="fas fa-filter" aria-hidden="true"></i>
+    <div>
+      Filtered by
+      {% if query %}search &ldquo;<strong>{{ query }}</strong>&rdquo;{% endif %}
+      {% if query and current_action %}&middot;{% endif %}
+      {% if current_action %}action <strong>{% for code, label in action_choices %}{% if code == current_action %}{{ label }}{% endif %}{% endfor %}</strong>{% endif %}
+      &middot; <a href="{% url 'admin_activity_history' %}" style="color: var(--sd-sage-700); font-weight: 700;">Clear all</a>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<section class="sd-card sd-table-card" aria-label="Activity log">
+  <div class="sd-card-head sd-table-head">
+    <div>
+      <h2 class="sd-card-title">Recorded activity</h2>
+      <p class="sd-card-sub">{{ total_count }} event{{ total_count|pluralize }} found</p>
+    </div>
+    <span class="sd-badge"><i class="fas fa-shield-halved" aria-hidden="true"></i>Audit trail</span>
+  </div>
+
+  <div class="sd-table-wrap">
+    <table class="sd-table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Related to</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>
+            <strong style="display: block; color: var(--sd-ink-soft); font-size: 10px; white-space: nowrap;">{{ log.created_at|date:"M j, Y" }}</strong>
+            <span style="color: var(--sd-muted); font-size: 9px; white-space: nowrap;">{{ log.created_at|date:"g:i A" }}</span>
+          </td>
+          <td>
+            {% if log.actor %}
+            <div class="sd-user-cell">
+              <span class="sd-user-avatar">{{ log.actor.username|first|upper }}</span>
+              <div class="sd-user-copy">
+                <strong>{{ log.actor.username }}</strong>
+              </div>
+            </div>
+            {% else %}
+            <span class="sd-status-text">System</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="sd-badge is-info"><i class="fas {{ log.icon }}" aria-hidden="true"></i>{{ log.get_action_display }}</span>
+          </td>
+          <td>
+            {% if log.concern_id %}
+            <a href="{% url 'admin_report_detail' 'concern' log.concern_id %}" style="color: var(--sd-sage-700); font-size: 10px; font-weight: 650; text-decoration: none;" title="{{ log.concern.title }}">
+              {{ log.concern.title|truncatechars:52 }}
+            </a>
+            {% elif log.confession_id %}
+            <a href="{% url 'admin_report_detail' 'confession' log.confession_id %}" style="color: var(--sd-sage-700); font-size: 10px; font-weight: 650; text-decoration: none;" title="{{ log.confession.title }}">
+              {{ log.confession.title|truncatechars:52 }}
+            </a>
+            {% elif log.target_user_id %}
+            <span class="sd-badge is-muted">Account</span>
+            <span style="color: var(--sd-ink-soft); font-size: 10px;">{{ log.target_user.username }}</span>
+            {% else %}
+            <span class="sd-badge is-muted">&mdash;</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if log.old_value or log.new_value %}
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 4px;">
+              <span class="sd-badge is-muted">{{ log.old_value|default:"—" }}</span>
+              <i class="fas fa-arrow-right" aria-hidden="true" style="color: var(--sd-muted); font-size: 7px;"></i>
+              <span class="sd-badge">{{ log.new_value|default:"—" }}</span>
+            </div>
+            {% endif %}
+            {% if log.detail %}
+            <div class="sd-note-text">{{ log.detail|truncatechars:180 }}</div>
+            {% elif not log.old_value and not log.new_value %}
+            <span class="sd-badge is-muted">&mdash;</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5">
+            <div class="sd-report-empty">
+              <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+              <strong>No activity found</strong>
+              <span>Try a different action or search term.</span>
+              <a href="{% url 'admin_activity_history' %}" class="sd-btn sd-btn-soft">
+                <i class="fas fa-rotate-left" aria-hidden="true"></i><span>Clear filters</span>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if logs.paginator.num_pages > 1 %}
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--sd-line);">
+    <p class="sd-result-count">
+      Showing <strong>{{ logs.start_index }}</strong> to <strong>{{ logs.end_index }}</strong> of <strong>{{ logs.paginator.count }}</strong> events
+    </p>
+    <ul class="pagination m-0">
+      {% if logs.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ logs.previous_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if current_action %}&amp;action={{ current_action }}{% endif %}">
+          <i class="fas fa-chevron-left me-1" aria-hidden="true"></i>Prev
+        </a>
+      </li>
+      {% endif %}
+      {% for num in logs.paginator.page_range %}
+      <li class="page-item {% if logs.number == num %}active{% endif %}">
+        <a class="page-link" href="?page={{ num }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if current_action %}&amp;action={{ current_action }}{% endif %}">{{ num }}</a>
+      </li>
+      {% endfor %}
+      {% if logs.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ logs.next_page_number }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if current_action %}&amp;action={{ current_action }}{% endif %}">
+          Next<i class="fas fa-chevron-right ms-1" aria-hidden="true"></i>
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,10 +1,13 @@
 """Models for the SafeSpeak anonymous school concern reporting system."""
 
 import uuid
+from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 
 class Category(models.Model):
@@ -12,6 +15,13 @@ class Category(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    keywords = models.TextField(
+        blank=True,
+        help_text=(
+            'Comma-separated words or phrases used by the NLP classifier. '
+            'End a word with * to match its beginning (for example, harass*).'
+        ),
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -37,7 +47,6 @@ class ConcernStatus(models.TextChoices):
 class Concern(models.Model):
     """An anonymous concern report submitted through SafeSpeak."""
 
-    ticket_number = models.CharField(max_length=36, unique=True, editable=False, default=uuid.uuid4)
     title = models.CharField(max_length=255)
     description = models.TextField()
     category = models.ForeignKey(
@@ -63,6 +72,16 @@ class Concern(models.Model):
         blank=True,
         related_name='filed_concerns',
     )
+    nlp_suggested_category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='suggested_concerns',
+    )
+    nlp_confidence = models.FloatField(default=0)
+    nlp_signals = models.CharField(max_length=255, blank=True)
+    nlp_analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'safespeak_concern'
@@ -70,15 +89,14 @@ class Concern(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['category', 'status']),
-            models.Index(fields=['ticket_number']),
         ]
 
     def __str__(self):
-        return f'{self.ticket_number}: {self.title}'
+        return self.title
 
 
 class ConcernNote(models.Model):
-    """Internal notes staff attach to a concern."""
+    """Internal notes administrators attach to a concern."""
 
     concern = models.ForeignKey(
         Concern,
@@ -100,7 +118,7 @@ class ConcernNote(models.Model):
         ordering = ['created_at']
 
     def __str__(self):
-        return f'Note on {self.concern.ticket_number} by {self.created_at:%Y-%m-%d}'
+        return f'Note on {self.concern.title} by {self.created_at:%Y-%m-%d}'
 
 
 class ConcernResponse(models.Model):
@@ -126,7 +144,7 @@ class ConcernResponse(models.Model):
         db_table = 'safespeak_concern_response'
 
     def __str__(self):
-        return f'Response to {self.concern.ticket_number}'
+        return f'Response to {self.concern.title}'
 
 
 class ConfessionResponse(models.Model):
@@ -152,13 +170,12 @@ class ConfessionResponse(models.Model):
         db_table = 'safespeak_confession_response'
 
     def __str__(self):
-        return f'Response to {self.confession.ticket_number}'
+        return f'Response to {self.confession.title}'
 
 
 class Confession(models.Model):
     """An anonymous confession submitted through SafeSpeak."""
 
-    ticket_number = models.CharField(max_length=36, unique=True, editable=False, default=uuid.uuid4)
     title = models.CharField(max_length=255)
     description = models.TextField()
     category = models.ForeignKey(
@@ -184,6 +201,16 @@ class Confession(models.Model):
         blank=True,
         related_name='filed_confessions',
     )
+    nlp_suggested_category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='suggested_confessions',
+    )
+    nlp_confidence = models.FloatField(default=0)
+    nlp_signals = models.CharField(max_length=255, blank=True)
+    nlp_analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'safespeak_confession'
@@ -191,11 +218,170 @@ class Confession(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['category', 'status']),
-            models.Index(fields=['ticket_number']),
         ]
 
     def __str__(self):
-        return f'{self.ticket_number}: {self.title}'
+        return self.title
+
+
+def report_image_upload_path(instance, filename):
+    """Store report images under a random name to avoid leaking filenames."""
+    extension = Path(filename).suffix.lower()
+    if extension not in {'.jpg', '.jpeg', '.png', '.webp'}:
+        extension = ''
+    return f'reports/images/{timezone.now():%Y/%m}/{uuid.uuid4().hex}{extension}'
+
+
+class ReportImage(models.Model):
+    """An image attached to a concern or confession."""
+
+    concern = models.ForeignKey(
+        Concern,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='images',
+    )
+    confession = models.ForeignKey(
+        Confession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='images',
+    )
+    image = models.FileField(upload_to=report_image_upload_path)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'safespeak_report_image'
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        report = self.concern or self.confession
+        return f'Image for {report.title}' if report else 'Report image'
+
+    def clean(self):
+        if bool(self.concern_id) == bool(self.confession_id):
+            raise ValidationError(
+                'An image must belong to exactly one report.'
+            )
+
+
+class AdminAction(models.TextChoices):
+    """Types of auditable actions recorded in the activity log."""
+
+    REPORT_SUBMITTED = 'REPORT_SUBMITTED', 'Report submitted'
+    STATUS_CHANGED = 'STATUS_CHANGED', 'Status changed'
+    CATEGORY_CHANGED = 'CATEGORY_CHANGED', 'Category changed'
+    CATEGORY_CREATED = 'CATEGORY_CREATED', 'Category created'
+    CATEGORY_UPDATED = 'CATEGORY_UPDATED', 'Category updated'
+    RESPONSE_SAVED = 'RESPONSE_SAVED', 'Response saved'
+    NOTE_ADDED = 'NOTE_ADDED', 'Note added'
+    COMMENT_ADDED = 'COMMENT_ADDED', 'Comment added'
+    COMMENT_EDITED = 'COMMENT_EDITED', 'Comment edited'
+    COMMENT_DELETED = 'COMMENT_DELETED', 'Comment deleted'
+    USER_CREATED = 'USER_CREATED', 'User created'
+    USER_UPDATED = 'USER_UPDATED', 'User updated'
+    USER_ROLE_CHANGED = 'USER_ROLE_CHANGED', 'User role changed'
+    USER_PASSWORD_RESET = 'USER_PASSWORD_RESET', 'Password reset'
+    USER_ACTIVATED = 'USER_ACTIVATED', 'User activated'
+    USER_DEACTIVATED = 'USER_DEACTIVATED', 'User deactivated'
+    USER_DELETED = 'USER_DELETED', 'User deleted'
+    SIGNED_IN = 'SIGNED_IN', 'Signed in'
+    SIGNED_OUT = 'SIGNED_OUT', 'Signed out'
+
+
+class AdminActivityLog(models.Model):
+    """Audit trail of administrator and user account activity."""
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admin_activity_logs',
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='targeted_activity_logs',
+    )
+    action = models.CharField(max_length=32, choices=AdminAction.choices)
+    concern = models.ForeignKey(
+        Concern,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='activity_logs',
+    )
+    confession = models.ForeignKey(
+        Confession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='activity_logs',
+    )
+    old_value = models.CharField(max_length=255, blank=True)
+    new_value = models.CharField(max_length=255, blank=True)
+    detail = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'safespeak_admin_activity_log'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['action']),
+            models.Index(fields=['target_user', '-created_at']),
+        ]
+
+    def __str__(self):
+        report = self.concern or self.confession
+        actor = self.actor or 'System'
+        if report is None:
+            return f'{self.get_action_display()} by {actor}'
+        return f'{self.get_action_display()} on {report} by {actor}'
+
+    @property
+    def report(self):
+        """Return the concern or confession this entry refers to."""
+        return self.concern or self.confession
+
+    @property
+    def kind(self):
+        """Return 'concern' or 'confession' for the linked report."""
+        if self.concern_id:
+            return 'concern'
+        if self.confession_id:
+            return 'confession'
+        return None
+
+    @property
+    def icon(self):
+        """Return the Font Awesome icon that represents this action."""
+        return {
+            AdminAction.SIGNED_IN: 'fa-right-to-bracket',
+            AdminAction.SIGNED_OUT: 'fa-right-from-bracket',
+            AdminAction.REPORT_SUBMITTED: 'fa-file-circle-plus',
+            AdminAction.STATUS_CHANGED: 'fa-arrows-rotate',
+            AdminAction.CATEGORY_CHANGED: 'fa-tags',
+            AdminAction.CATEGORY_CREATED: 'fa-folder-plus',
+            AdminAction.CATEGORY_UPDATED: 'fa-pen-to-square',
+            AdminAction.RESPONSE_SAVED: 'fa-reply',
+            AdminAction.NOTE_ADDED: 'fa-note-sticky',
+            AdminAction.COMMENT_ADDED: 'fa-comment',
+            AdminAction.COMMENT_EDITED: 'fa-comment-dots',
+            AdminAction.COMMENT_DELETED: 'fa-comment-slash',
+            AdminAction.USER_CREATED: 'fa-user-plus',
+            AdminAction.USER_UPDATED: 'fa-user-pen',
+            AdminAction.USER_ROLE_CHANGED: 'fa-user-shield',
+            AdminAction.USER_PASSWORD_RESET: 'fa-key',
+            AdminAction.USER_ACTIVATED: 'fa-user-check',
+            AdminAction.USER_DEACTIVATED: 'fa-user-slash',
+            AdminAction.USER_DELETED: 'fa-user-xmark',
+        }.get(self.action, 'fa-clock-rotate-left')
 
 
 class ReportComment(models.Model):

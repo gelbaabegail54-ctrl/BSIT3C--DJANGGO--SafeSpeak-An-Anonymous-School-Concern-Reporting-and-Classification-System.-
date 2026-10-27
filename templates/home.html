@@ -1,34 +1,274 @@
-{% extends "theme/base.html" %}
-{% block content %}
-<div class="row g-3 pt-2">
-  <!-- Timeline -->
-  <div class="col-lg-8">
-    <div class="card dh-feed-header mb-3">
+{% extends "theme/dashboard_base.html" %}
+{% load static %}
+
+{% block dashboard_content %}
+<div class="sd-page dh-home-fullscreen">
+
+  <header class="sd-topbar">
+    <div class="sd-topbar-copy">
+      <span class="sd-eyebrow"><i class="far fa-calendar" aria-hidden="true"></i>{% now "l, F j, Y" %}</span>
+      <h1 class="sd-title">{{ greeting }}, <em>{{ user.first_name|default:user.username }}</em></h1>
+      <p class="sd-subtitle">Your quiet corner of SafeSpeak. Track your reports, catch up on replies, and see what the community is talking about.</p>
+    </div>
+    <div class="sd-topbar-actions">
+      <label class="sd-search">
+        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="sd-feed-search" placeholder="Search the community feed" autocomplete="off">
+      </label>
+      <a href="{% url 'my_reports' %}" class="sd-icon-btn" aria-label="View your responses">
+        <i class="far fa-bell" aria-hidden="true"></i>
+        {% if my_responses %}<span class="sd-icon-badge">{{ my_responses }}</span>{% endif %}
+      </a>
+      <a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">
+        <i class="fas fa-plus" aria-hidden="true"></i><span>New report</span>
+      </a>
+    </div>
+  </header>
+
+  {% if messages %}
+  <div class="sd-messages">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+      <i class="fas {% if message.tags == 'success' %}fa-circle-check{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} alert-icon" aria-hidden="true"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <section class="sd-kpi-grid" aria-label="Your report summary">
+    <article class="sd-kpi">
+      <span class="sd-kpi-icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">My reports</span>
+        <strong class="sd-kpi-value">{{ my_total }}</strong>
+        <span class="sd-kpi-meta">Linked to your account</span>
+      </div>
+      <span class="sd-kpi-chip"><i class="fas fa-link" aria-hidden="true"></i>Tracking</span>
+    </article>
+    <article class="sd-kpi is-amber">
+      <span class="sd-kpi-icon"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Open cases</span>
+        <strong class="sd-kpi-value">{{ my_open }}</strong>
+        <span class="sd-kpi-meta">Being reviewed by the team</span>
+      </div>
+      <span class="sd-kpi-chip {% if my_open %}is-warn{% endif %}">{% if my_open %}Active{% else %}Clear{% endif %}</span>
+    </article>
+    <article class="sd-kpi is-teal">
+      <span class="sd-kpi-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Resolved</span>
+        <strong class="sd-kpi-value">{{ my_resolved }}</strong>
+        <span class="sd-kpi-meta">Closed with a resolution</span>
+      </div>
+      <span class="sd-kpi-chip"><i class="fas fa-seedling" aria-hidden="true"></i>Growth</span>
+    </article>
+    <article class="sd-kpi is-rose">
+      <span class="sd-kpi-icon"><i class="fas fa-reply-all" aria-hidden="true"></i></span>
+      <div class="sd-kpi-body">
+        <span class="sd-kpi-label">Responses</span>
+        <strong class="sd-kpi-value">{{ my_responses }}</strong>
+        <span class="sd-kpi-meta">Replies from the SafeSpeak team</span>
+      </div>
+      <span class="sd-kpi-chip"><i class="fas fa-inbox" aria-hidden="true"></i>Inbox</span>
+    </article>
+  </section>
+
+  <div class="sd-grid">
+    <section class="sd-card sd-col-7 sd-mine-card" aria-labelledby="sd-my-reports-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-my-reports-title">Your latest reports</h2>
+          <p class="sd-card-sub">Progress on the reports you chose to link to your account.</p>
+        </div>
+        <a href="{% url 'my_reports' %}" class="sd-link">View all <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+
+      {% if my_recent_reports %}
+      <div class="sd-report-stack">
+        {% for item in my_recent_reports %}
+        {% with thumb=item.report.images.all|first %}
+        <article class="sd-report-row">
+          <span class="sd-report-thumb">
+            {% if thumb %}
+            <img src="{{ thumb.image.url }}" alt="" loading="lazy">
+            {% else %}
+            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
+            {% endif %}
+          </span>
+          <div class="sd-report-main">
+            <div class="sd-report-topline">
+              <a href="{% url 'my_reports' %}" class="sd-report-title" title="{{ item.report.title }}">{{ item.report.title|truncatechars:48 }}</a>
+              <span class="sd-status-pill {% if item.report.status == 'RESOLVED' %}is-resolved{% elif item.report.status == 'DISMISSED' %}is-dismissed{% elif item.report.status == 'IN_PROGRESS' %}is-progress{% elif item.report.status == 'UNDER_REVIEW' %}is-review{% else %}is-submitted{% endif %}">{{ item.report.get_status_display }}</span>
+            </div>
+            <div class="sd-report-meta">{{ item.label }} &middot; {{ item.report.category.name }} &middot; {{ item.report.submitted_at|date:"M j, Y" }}</div>
+            <div class="sd-report-progress">
+              <div class="sd-progress" role="progressbar" aria-label="Report progress" aria-valuenow="{{ item.progress }}" aria-valuemin="0" aria-valuemax="100">
+                <span style="width: {{ item.progress }}%"></span>
+              </div>
+            </div>
+          </div>
+          <div class="sd-report-aside">
+            <span class="sd-report-time">{{ item.report.submitted_at|timesince }} ago</span>
+            {% if item.has_response %}
+            <span class="sd-response-flag"><i class="fas fa-reply" aria-hidden="true"></i>Response</span>
+            {% endif %}
+          </div>
+        </article>
+        {% endwith %}
+        {% endfor %}
+      </div>
+
+      <div class="sd-mine-progress">
+        <div class="sd-mine-progress-head">
+          <span>Your resolution rate</span>
+          <strong>{{ my_resolution_rate }}%</strong>
+        </div>
+        <div class="sd-progress" role="progressbar" aria-label="Your resolution rate" aria-valuenow="{{ my_resolution_rate }}" aria-valuemin="0" aria-valuemax="100">
+          <span style="width: {{ my_resolution_rate }}%"></span>
+        </div>
+        <span class="sd-mine-progress-note">{{ my_resolved }} of {{ my_total }} linked report{{ my_total|pluralize }} resolved{% if my_open %} &middot; {{ my_open }} still open{% endif %}</span>
+      </div>
+      {% else %}
+      <div class="sd-panel-empty">
+        <i class="fas fa-folder-open" aria-hidden="true"></i>
+        <strong>No linked reports yet</strong>
+        <span>Submit a report while signed in and choose to link it to your account to follow its progress here.</span>
+        <a href="{% url 'submit_concern' %}" class="sd-btn sd-btn-primary">Report a concern</a>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="sd-card sd-col-5 sd-resolution-card" aria-labelledby="sd-community-ring-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-community-ring-title">Community resolution</h2>
+          <p class="sd-card-sub">How the SafeSpeak community is doing right now.</p>
+        </div>
+        <span class="sd-status-pill is-resolved">Live</span>
+      </div>
+
+      <div class="sd-resolution">
+        <div class="sd-ring" style="--value: {{ community_resolution_rate }};" role="img" aria-label="{{ community_resolution_rate }} percent of community reports resolved">
+          <div class="sd-ring-inner">
+            <span class="sd-ring-value">{{ community_resolution_rate }}<small>%</small></span>
+            <span class="sd-ring-label">Resolved</span>
+          </div>
+        </div>
+        <p class="sd-ring-caption"><strong>{{ community_resolved }}</strong> of <strong>{{ community_total }}</strong> community reports have been resolved.</p>
+        <div class="sd-resolution-stats">
+          <div class="sd-resolution-stat"><strong>{{ community_total }}</strong><span>Total</span></div>
+          <div class="sd-resolution-stat"><strong>{{ community_open }}</strong><span>Open</span></div>
+          <div class="sd-resolution-stat"><strong>{{ community_resolved }}</strong><span>Resolved</span></div>
+        </div>
+        <div class="sd-status-list">
+          {% for status in community_status_breakdown %}
+          <div class="sd-status-row">
+            <div class="sd-status-row-head">
+              <span class="sd-status-name"><span class="sd-dot" style="--dot-color: {{ status.color }};"></span>{{ status.label }}</span>
+              <span class="sd-status-count">{{ status.total }}</span>
+            </div>
+            <div class="sd-progress">
+              <span style="width: {{ status.percent }}%; --bar-color: {{ status.color }};"></span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="sd-card sd-col-7" aria-labelledby="sd-topics-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-topics-title">Browse by topic</h2>
+          <p class="sd-card-sub">Folders keep every concern and confession easy to find.</p>
+        </div>
+        <a href="{% url 'my_reports' %}" class="sd-link">Open reports <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+
+      {% if category_folders %}
+      <div class="sd-folder-grid">
+        {% for folder in category_folders %}
+        {% cycle 'fa-heart-pulse' 'fa-people-group' 'fa-building-columns' 'fa-book-open' 'fa-shield-halved' 'fa-leaf' 'fa-hand-holding-heart' 'fa-lightbulb' as folder_icon silent %}
+        <a class="sd-folder" href="{% url 'my_reports' %}" title="View {{ folder.category.name }} reports">
+          <span class="sd-folder-art"><i class="fas {{ folder_icon }}" aria-hidden="true"></i></span>
+          <span class="sd-folder-name">{{ folder.category.name }}</span>
+          <span class="sd-folder-count">{{ folder.total }} report{{ folder.total|pluralize }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="sd-folder-empty">Topic folders will appear here once categories are added.</div>
+      {% endif %}
+    </section>
+
+    <section class="sd-card sd-col-5" aria-labelledby="sd-snapshots-title">
+      <div class="sd-card-head">
+        <div>
+          <h2 class="sd-card-title" id="sd-snapshots-title">Recent snapshots</h2>
+          <p class="sd-card-sub">Images shared with the latest community reports.</p>
+        </div>
+        <a href="#community-feed" class="sd-link">See feed <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
+      </div>
+
+      {% if feed %}
+      <div class="sd-snap-grid">
+        {% for item in feed|slice:":4" %}
+        {% with thumb=item.report.images.all|first %}
+        <a href="#report-{{ item.kind }}-{{ item.report.pk }}" class="sd-snap" aria-label="Jump to {{ item.report.title }}">
+          {% if thumb %}
+          <img src="{{ thumb.image.url }}" alt="Image attached to {{ item.report.title }}" loading="lazy">
+          {% else %}
+          <span class="sd-snap-placeholder {% if item.kind == 'confession' %}is-confession{% endif %}">
+            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
+          </span>
+          {% endif %}
+          <span class="sd-snap-body">
+            <span class="sd-snap-label">{{ item.label }} &middot; {{ item.report.category.name }}</span>
+            <span class="sd-snap-title">{{ item.report.title|truncatechars:42 }}</span>
+          </span>
+        </a>
+        {% endwith %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="sd-snap-empty">
+        <div><i class="fas fa-image" aria-hidden="true"></i>Community snapshots will appear here as reports come in.</div>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="sd-community" id="community-feed" aria-label="Community feed">
+    <div class="card dh-feed-header">
       <div class="card-body py-3">
         <div class="d-flex align-items-start justify-content-between gap-2">
           <div>
-            <h2 class="h3 mb-0">Home</h2>
-            <div class="text-secondary small">Anonymous reports from the SafeSpeak community</div>
+            <h2 class="h3 mb-0">Community feed</h2>
+            <div class="text-secondary small">Anonymous reports and confessions from the SafeSpeak community</div>
           </div>
+          <span class="sd-status-pill is-submitted">{{ feed|length }} recent post{{ feed|length|pluralize }}</span>
         </div>
         <div class="dh-feed-tabs mt-3" role="tablist" aria-label="Feed filters">
           <button type="button" class="dh-feed-tab active" data-feed-filter="all" aria-pressed="true">
-            <i class="fas fa-layer-group me-1"></i>Latest
+            <i class="fas fa-layer-group me-1" aria-hidden="true"></i>Latest
           </button>
           <button type="button" class="dh-feed-tab" data-feed-filter="concern" aria-pressed="false">
-            <i class="fas fa-triangle-exclamation me-1"></i>Concerns
+            <i class="fas fa-triangle-exclamation me-1" aria-hidden="true"></i>Concerns
           </button>
           <button type="button" class="dh-feed-tab" data-feed-filter="confession" aria-pressed="false">
-            <i class="fas fa-comment-dots me-1"></i>Confessions
+            <i class="fas fa-comment-dots me-1" aria-hidden="true"></i>Confessions
           </button>
         </div>
       </div>
     </div>
 
-    <div class="card dh-compose mb-3">
+    <div class="card dh-compose">
       <div class="card-body">
         <div class="d-flex gap-3">
-          <span class="dh-feed-avatar dh-feed-avatar-user">{{ user.username|default:"A"|first|upper }}</span>
+          <span class="dh-feed-avatar dh-feed-avatar-user">{{ user.first_name|default:user.username|first|upper }}</span>
           <div class="flex-grow-1">
             <a class="dh-compose-input" href="{% url 'submit_concern' %}">
               What would you like to report?
@@ -36,10 +276,10 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
               <div class="dh-compose-actions">
                 <a href="{% url 'submit_concern' %}" class="dh-compose-action">
-                  <i class="fas fa-triangle-exclamation" style="color:#e8590c;"></i>Concern
+                  <i class="fas fa-triangle-exclamation" style="color:#a07c31;" aria-hidden="true"></i>Concern
                 </a>
                 <a href="{% url 'submit_confession' %}" class="dh-compose-action">
-                  <i class="fas fa-comment-dots" style="color:#c2255c;"></i>Confession
+                  <i class="fas fa-comment-dots" style="color:#9c6666;" aria-hidden="true"></i>Confession
                 </a>
               </div>
               <a href="{% url 'submit_concern' %}" class="btn btn-primary btn-sm rounded-pill px-3">
@@ -58,7 +298,7 @@
       <article class="dh-feed-item" data-feed-kind="{{ item.kind }}" id="report-{{ item.kind }}-{{ item.report.pk }}">
         <div class="d-flex gap-3">
           <span class="dh-feed-avatar {% if item.kind == 'concern' %}dh-feed-avatar-concern{% else %}dh-feed-avatar-confession{% endif %}">
-            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}"></i>
+            <i class="fas {% if item.kind == 'concern' %}fa-triangle-exclamation{% else %}fa-comment-dots{% endif %}" aria-hidden="true"></i>
           </span>
           <div class="dh-feed-body flex-grow-1">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
@@ -69,17 +309,28 @@
               <span class="badge bg-primary-lt text-primary">{{ item.report.category.name }}</span>
               {% endif %}
               {% if item.report.is_urgent %}
-              <span class="badge bg-danger-lt text-danger"><i class="fas fa-bolt me-1"></i>Urgent</span>
+              <span class="badge bg-danger-lt text-danger"><i class="fas fa-bolt me-1" aria-hidden="true"></i>Urgent</span>
               {% endif %}
             </div>
             <p class="dh-feed-text mb-2">{{ item.report.description|truncatechars:280 }}</p>
+            {% with report_images=item.report.images.all %}
+            {% if report_images %}
+            <div class="report-attachments">
+              {% for image in report_images %}
+              <a class="report-attachment" href="{{ image.image.url }}" target="_blank" rel="noopener noreferrer" aria-label="Open image attached to this {{ item.label|lower }}">
+                <img src="{{ image.image.url }}" alt="Image attached to this anonymous {{ item.label|lower }}" loading="lazy">
+              </a>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
               <span class="badge {% if item.report.status == 'RESOLVED' %}bg-success-lt text-success{% elif item.report.status == 'DISMISSED' %}bg-danger-lt text-danger{% elif item.report.status == 'IN_PROGRESS' %}bg-info-lt text-info{% elif item.report.status == 'UNDER_REVIEW' %}bg-warning-lt text-warning{% else %}bg-primary-lt text-primary{% endif %}">
                 {{ item.report.get_status_display }}
               </span>
               <div class="d-flex align-items-center gap-1">
                 <button type="button" class="dh-post-action" data-bs-toggle="collapse" data-bs-target="#comments-{{ item.kind }}-{{ item.report.pk }}" aria-expanded="false" aria-controls="comments-{{ item.kind }}-{{ item.report.pk }}">
-                  <i class="fas fa-comment"></i>
+                  <i class="fas fa-comment" aria-hidden="true"></i>
                   <span>{{ item.comment_count }} Comment{{ item.comment_count|pluralize }}</span>
                 </button>
               </div>
@@ -100,12 +351,12 @@
                       {% if comment.author_id == user.id or user.is_superuser %}
                       <div class="dh-comment-actions ms-auto">
                         <button type="button" class="dh-comment-action" data-bs-toggle="collapse" data-bs-target="#edit-comment-{{ comment.pk }}" aria-expanded="false" aria-controls="edit-comment-{{ comment.pk }}">
-                          <i class="fas fa-pen me-1"></i>Edit
+                          <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
                         </button>
                         <form method="post" action="{% url 'delete_comment' comment.pk %}" class="d-inline" onsubmit="return confirm('Delete this comment?');">
                           {% csrf_token %}
                           <button type="submit" class="dh-comment-action dh-comment-action-danger">
-                            <i class="fas fa-trash me-1"></i>Delete
+                            <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
                           </button>
                         </form>
                       </div>
@@ -122,7 +373,7 @@
                             Cancel
                           </button>
                           <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">
-                            <i class="fas fa-check me-1"></i>Save
+                            <i class="fas fa-check me-1" aria-hidden="true"></i>Save
                           </button>
                         </div>
                       </form>
@@ -142,9 +393,9 @@
                 <div class="flex-grow-1">
                   <textarea class="form-control" name="body" rows="2" maxlength="1000" placeholder="Write an anonymous comment..." aria-label="Write an anonymous comment" required></textarea>
                   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
-                    <span class="text-secondary small"><i class="fas fa-lock me-1"></i>Comments are anonymous.</span>
+                    <span class="text-secondary small"><i class="fas fa-lock me-1" aria-hidden="true"></i>Comments are anonymous.</span>
                     <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">
-                      <i class="fas fa-paper-plane me-1"></i>Comment
+                      <i class="fas fa-paper-plane me-1" aria-hidden="true"></i>Comment
                     </button>
                   </div>
                 </div>
@@ -156,7 +407,7 @@
       {% empty %}
       <div class="dh-feed-empty text-center py-5">
         <div class="d-flex justify-content-center mb-3">
-          <span class="dh-feed-avatar dh-feed-avatar-concern"><i class="fas fa-inbox"></i></span>
+          <span class="dh-feed-avatar dh-feed-avatar-concern"><i class="fas fa-inbox" aria-hidden="true"></i></span>
         </div>
         <h3 class="mb-1">No reports yet</h3>
         <p class="text-secondary mb-3">Be the first to share a concern or confession.</p>
@@ -165,108 +416,15 @@
       {% endfor %}
       {% if feed %}
       <div class="dh-feed-end text-center text-secondary small py-4">
-        <i class="fas fa-circle-check text-success me-1"></i>You're all caught up
+        <i class="fas fa-circle-check text-success me-1" aria-hidden="true"></i>You're all caught up
       </div>
       {% endif %}
       <div id="feed-filter-empty" class="dh-feed-empty text-center py-5 d-none">
         <h3 class="mb-1">Nothing here yet</h3>
-        <p class="text-secondary mb-0">No reports match this filter.</p>
+        <p class="text-secondary mb-0">No reports match this filter or search.</p>
       </div>
     </div>
-  </div>
-
-  <!-- Right column -->
-  <div class="col-lg-4">
-    <div class="dh-feed-aside">
-      <div class="card mb-3">
-        <div class="card-header">
-          <h3 class="card-title">SafeSpeak at a glance</h3>
-        </div>
-        <div class="card-body">
-          <div class="row g-2 text-center">
-            <div class="col-6">
-              <div class="dh-mini-stat">
-                <div class="h3 mb-0">{{ total_reports }}</div>
-                <div class="text-secondary small">Total reports</div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="dh-mini-stat">
-                <div class="h3 mb-0">{{ open_reports }}</div>
-                <div class="text-secondary small">Open</div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="dh-mini-stat">
-                <div class="h3 mb-0">{{ resolved_reports }}</div>
-                <div class="text-secondary small">Resolved</div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="dh-mini-stat">
-                <div class="h3 mb-0 text-danger">{{ urgent_reports }}</div>
-                <div class="text-secondary small">Urgent</div>
-              </div>
-            </div>
-          </div>
-          <div class="d-flex justify-content-between text-secondary small mt-3">
-            <span>{{ total_concerns }} concern{{ total_concerns|pluralize }}</span>
-            <span>{{ total_confessions }} confession{{ total_confessions|pluralize }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header">
-          <h3 class="card-title">Reports by category</h3>
-        </div>
-        <div class="card-body">
-          {% for row in category_stats %}
-          <div class="mb-3">
-            <div class="d-flex justify-content-between align-items-baseline mb-1">
-              <span class="fw-semibold">{{ row.name }}</span>
-              <span class="text-secondary small">{{ row.total }}</span>
-            </div>
-            <div class="progress progress-sm">
-              <div class="progress-bar" role="progressbar" style="width: {{ row.percent }}%" aria-valuenow="{{ row.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-          </div>
-          {% empty %}
-          <div class="text-secondary small">No categories yet.</div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header">
-          <h3 class="card-title">Status overview</h3>
-        </div>
-        <div class="card-body">
-          {% for row in status_breakdown %}
-          <div class="d-flex align-items-center justify-content-between py-1">
-            <span class="d-flex align-items-center gap-2">
-              <span class="dh-status-dot {% if row.code == 'RESOLVED' %}bg-success{% elif row.code == 'DISMISSED' %}bg-danger{% elif row.code == 'IN_PROGRESS' %}bg-info{% elif row.code == 'UNDER_REVIEW' %}bg-warning{% else %}bg-primary{% endif %}"></span>
-              <span class="text-secondary">{{ row.label }}</span>
-            </span>
-            <span class="fw-semibold">{{ row.count }}</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-body">
-          <div class="d-flex gap-2">
-            <i class="fas fa-lock text-primary mt-1"></i>
-            <div>
-              <div class="fw-semibold">Your identity stays private</div>
-              <div class="text-secondary small">Reports are shown without names or accounts.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 </div>
 {% endblock %}
 
@@ -276,6 +434,28 @@
     const tabs = document.querySelectorAll("[data-feed-filter]");
     const items = document.querySelectorAll(".dh-feed-item");
     const emptyState = document.getElementById("feed-filter-empty");
+    const searchInput = document.getElementById("sd-feed-search");
+    let activeFilter = "all";
+
+    function applyFeedFilters() {
+      const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
+      let visible = 0;
+
+      items.forEach(function (item) {
+        const matchesKind = activeFilter === "all" || item.getAttribute("data-feed-kind") === activeFilter;
+        const matchesSearch = !query || item.textContent.toLowerCase().indexOf(query) !== -1;
+        const show = matchesKind && matchesSearch;
+
+        item.style.display = show ? "" : "none";
+        if (show) {
+          visible += 1;
+        }
+      });
+
+      if (emptyState) {
+        emptyState.classList.toggle("d-none", visible !== 0 || items.length === 0);
+      }
+    }
 
     function openLinkedComments() {
       const hash = window.location.hash;
@@ -288,6 +468,14 @@
         return;
       }
 
+      const allTab = document.querySelector('[data-feed-filter="all"]');
+      if (allTab && activeFilter !== "all") {
+        allTab.click();
+      } else {
+        article.style.display = "";
+        applyFeedFilters();
+      }
+
       const section = article.querySelector(".dh-comment-section");
       if (section && window.bootstrap) {
         bootstrap.Collapse.getOrCreateInstance(section, { toggle: false }).show();
@@ -295,31 +483,22 @@
       article.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    openLinkedComments();
-
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        const filter = tab.getAttribute("data-feed-filter");
-        let visible = 0;
-
+        activeFilter = tab.getAttribute("data-feed-filter");
         tabs.forEach(function (other) {
           other.classList.toggle("active", other === tab);
           other.setAttribute("aria-pressed", other === tab ? "true" : "false");
         });
-
-        items.forEach(function (item) {
-          const matches = filter === "all" || item.getAttribute("data-feed-kind") === filter;
-          item.style.display = matches ? "" : "none";
-          if (matches) {
-            visible += 1;
-          }
-        });
-
-        if (emptyState) {
-          emptyState.classList.toggle("d-none", visible !== 0 || items.length === 0);
-        }
+        applyFeedFilters();
       });
     });
+
+    if (searchInput) {
+      searchInput.addEventListener("input", applyFeedFilters);
+    }
+
+    openLinkedComments();
   });
 </script>
 {% endblock %}
