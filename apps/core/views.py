@@ -21,6 +21,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.urls import reverse
 from apps.users.views import _is_superuser
 
+from .codenames import user_codename
 from .models import (
     AdminAction,
     AdminActivityLog,
@@ -357,6 +358,10 @@ def submit_concern(request):
                 is_urgent=is_urgent,
                 status=ConcernStatus.SUBMITTED,
                 submitted_by=reporter,
+                poster_codename=(
+                    user_codename(request.user.pk)
+                    if request.user.is_authenticated else ''
+                ),
             )
             for image in images:
                 ReportImage.objects.create(concern=concern, image=image)
@@ -382,6 +387,7 @@ def submit_concern(request):
         return render(request, 'submit_concern.html', {
             'submission_successful': True,
             'linked_to_account': reporter is not None,
+            'submission_codename': concern.codename,
         })
 
 
@@ -428,6 +434,10 @@ def submit_confession(request):
                 is_urgent=is_urgent,
                 status=ConcernStatus.SUBMITTED,
                 submitted_by=reporter,
+                poster_codename=(
+                    user_codename(request.user.pk)
+                    if request.user.is_authenticated else ''
+                ),
             )
             for image in images:
                 ReportImage.objects.create(confession=confession, image=image)
@@ -453,6 +463,7 @@ def submit_confession(request):
         return render(request, 'submit_confession.html', {
             'submission_successful': True,
             'linked_to_account': reporter is not None,
+            'submission_codename': confession.codename,
         })
 
 
@@ -927,9 +938,6 @@ def team_management(request):
 NLP_QUEUE_FILTERS = (
     ('attention', 'Needs review'),
     ('all', 'All reports'),
-    ('mismatch', 'Mismatches'),
-    ('low', 'Low confidence'),
-    ('unanalyzed', 'Not analyzed'),
 )
 
 
@@ -998,12 +1006,6 @@ def _nlp_queue(request):
             item for item in items
             if not item['analyzed'] or item['mismatch'] or item['low_confidence']
         ]
-    elif queue_filter == 'mismatch':
-        items = [item for item in items if item['mismatch']]
-    elif queue_filter == 'low':
-        items = [item for item in items if item['low_confidence']]
-    elif queue_filter == 'unanalyzed':
-        items = [item for item in items if not item['analyzed']]
 
     items.sort(key=_nlp_queue_sort_key)
     paginator = Paginator(items, 10)

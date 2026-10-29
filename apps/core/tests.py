@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.codenames import user_codename
 from apps.core.images import MAX_REPORT_IMAGES
 from apps.core.models import (
     AdminAction,
@@ -48,12 +49,74 @@ class HomeViewTests(TestCase):
         self.assertContains(response, 'dh-home-fullscreen')
         self.assertContains(response, '<span class="nav-link-title">Dashboard</span>')
         self.assertContains(response, reverse('my_reports'))
+        self.assertContains(response, 'You post as')
+        self.assertContains(response, user_codename(user.pk))
         self.assertNotContains(response, 'Your identity stays private')
 
     def test_home_requires_login(self):
         response = self.client.get(reverse('dashboard'))
 
         self.assertEqual(response.status_code, 302)
+
+
+class AnonymousCodenameTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='codenameuser',
+            password='codepass123',
+        )
+        self.category = Category.objects.create(name='General')
+        self.concern = Concern.objects.create(
+            title='A private concern',
+            description='Something the community should see.',
+            category=self.category,
+        )
+
+    def test_feed_uses_code_name_for_unlinked_report(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertContains(response, self.concern.codename)
+        self.assertNotContains(response, '<span class="fw-bold">Anonymous</span>')
+
+    def test_feed_uses_user_code_name_for_linked_report(self):
+        self.concern.submitted_by = self.user
+        self.concern.save(update_fields=['submitted_by'])
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertContains(response, self.concern.codename)
+
+    def test_comment_uses_author_code_name(self):
+        comment = ReportComment.objects.create(
+            concern=self.concern,
+            author=self.user,
+            body='A supportive comment.',
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertContains(response, comment.codename)
+
+    def test_account_shows_community_code_name(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('my_account'))
+
+        self.assertContains(response, 'Community code name')
+        self.assertContains(response, user_codename(self.user.pk))
+
+    def test_submission_pages_show_community_code_name(self):
+        self.client.force_login(self.user)
+
+        for url_name in ('submit_concern', 'submit_confession'):
+            response = self.client.get(reverse(url_name))
+
+            self.assertContains(response, 'Posting as')
+            self.assertContains(response, user_codename(self.user.pk))
 
 
 class SupportPagesTests(TestCase):
@@ -1360,6 +1423,26 @@ class ReportAccountLinkTests(TestCase):
         )
         self.concern_url = reverse('submit_concern')
         self.confession_url = reverse('submit_confession')
+
+    def test_logged_in_reports_use_the_users_community_code_name(self):
+        self.client.force_login(self.user)
+
+        for url_name in ('submit_concern', 'submit_confession'):
+            response = self.client.post(
+                reverse(url_name),
+                {'description': 'A report shared without linking my account.'},
+            )
+
+            report_model = (
+                Concern if url_name == 'submit_concern' else Confession
+            )
+            report = report_model.objects.latest('pk')
+            self.assertEqual(
+                report.poster_codename,
+                user_codename(self.user.pk),
+            )
+            self.assertEqual(report.codename, user_codename(self.user.pk))
+            self.assertContains(response, report.codename)
 
     def test_anonymous_concern_ignores_link_option(self):
         response = self.client.post(

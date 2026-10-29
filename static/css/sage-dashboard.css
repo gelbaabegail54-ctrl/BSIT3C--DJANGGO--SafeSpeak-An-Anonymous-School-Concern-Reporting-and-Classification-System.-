@@ -276,6 +276,17 @@ body.sd-body.sd-admin .sd-sidebar {
   letter-spacing: 0.04em;
 }
 
+.sd-profile-code {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #cfe3d2;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sd-profile-link {
   display: grid;
   flex-shrink: 0;

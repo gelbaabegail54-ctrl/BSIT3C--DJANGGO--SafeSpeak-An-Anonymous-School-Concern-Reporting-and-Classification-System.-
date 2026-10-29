@@ -62,7 +62,7 @@
             {% if report.submitted_by %}
               {{ report.submitted_by.username }}
             {% else %}
-              Anonymous
+              {{ report.codename }}
             {% endif %}
           </strong>
         </div>
@@ -257,7 +257,7 @@
             {% if report.submitted_by %}
             Linked to {{ report.submitted_by.username }}&rsquo;s account
             {% else %}
-            Submitted anonymously through SafeSpeak
+            Submitted anonymously as {{ report.codename }}
             {% endif %}
           </span>
         </div>

@@ -9,6 +9,13 @@
       <span class="sd-eyebrow"><i class="far fa-calendar" aria-hidden="true"></i>{% now "l, F j, Y" %}</span>
       <h1 class="sd-title">{{ greeting }}, <em>{{ user.first_name|default:user.username }}</em></h1>
       <p class="sd-subtitle">Your quiet corner of SafeSpeak. Track your reports, catch up on replies, and see what the community is talking about.</p>
+      {% if not user.is_superuser %}
+      <div style="margin-top: 9px;">
+        <span class="sd-badge is-muted" title="Your community code name">
+          <i class="fas fa-user-secret" aria-hidden="true"></i>You post as {{ current_codename }}
+        </span>
+      </div>
+      {% endif %}
     </div>
     <div class="sd-topbar-actions">
       <label class="sd-search">
@@ -268,7 +275,7 @@
     <div class="card dh-compose">
       <div class="card-body">
         <div class="d-flex gap-3">
-          <span class="dh-feed-avatar dh-feed-avatar-user">{{ user.first_name|default:user.username|first|upper }}</span>
+          <span class="dh-feed-avatar dh-feed-avatar-user">{{ current_codename|first }}</span>
           <div class="flex-grow-1">
             <a class="dh-compose-input" href="{% url 'submit_concern' %}">
               What would you like to report?
@@ -302,7 +309,7 @@
           </span>
           <div class="dh-feed-body flex-grow-1">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-              <span class="fw-bold">Anonymous</span>
+              <span class="fw-bold">{{ item.report.codename }}</span>
               <span class="text-secondary small">{{ item.report.submitted_at|timesince }} ago</span>
               <span class="badge bg-secondary-lt text-secondary">{{ item.label }}</span>
               {% if item.report.category %}
@@ -341,10 +348,10 @@
               <div class="dh-comment-list">
                 {% for comment in item.comments %}
                 <div class="dh-comment">
-                  <span class="dh-feed-avatar dh-feed-avatar-anon">A</span>
+                  <span class="dh-feed-avatar dh-feed-avatar-anon">{{ comment.codename|first }}</span>
                   <div class="dh-comment-body">
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                      <span class="fw-semibold">Anonymous</span>
+                      <span class="fw-semibold">{{ comment.codename }}</span>
                       <span class="text-secondary small">
                         {{ comment.created_at|timesince }} ago{% if comment.is_edited %} &middot; edited{% endif %}
                       </span>
@@ -389,11 +396,11 @@
 
               <form method="post" action="{% url 'add_comment' item.kind item.report.pk %}" class="dh-comment-form">
                 {% csrf_token %}
-                <span class="dh-feed-avatar dh-feed-avatar-anon">A</span>
+                <span class="dh-feed-avatar dh-feed-avatar-anon">{{ current_codename|first }}</span>
                 <div class="flex-grow-1">
-                  <textarea class="form-control" name="body" rows="2" maxlength="1000" placeholder="Write an anonymous comment..." aria-label="Write an anonymous comment" required></textarea>
+                  <textarea class="form-control" name="body" rows="2" maxlength="1000" placeholder="Write a comment as {{ current_codename }}..." aria-label="Write a comment as {{ current_codename }}" required></textarea>
                   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
-                    <span class="text-secondary small"><i class="fas fa-lock me-1" aria-hidden="true"></i>Comments are anonymous.</span>
+                    <span class="text-secondary small"><i class="fas fa-user-secret me-1" aria-hidden="true"></i>Comments use your community code name.</span>
                     <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">
                       <i class="fas fa-paper-plane me-1" aria-hidden="true"></i>Comment
                     </button>

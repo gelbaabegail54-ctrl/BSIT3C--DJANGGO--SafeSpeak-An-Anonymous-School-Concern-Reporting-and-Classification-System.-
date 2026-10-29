@@ -32,6 +32,9 @@
       <span class="sd-profile-text">
         <span class="sd-profile-name">{{ user.get_full_name|default:user.username }}</span>
         <span class="sd-profile-role">{% if user.is_superuser %}Administrator{% else %}Student{% endif %}</span>
+        {% if not user.is_superuser %}
+        <span class="sd-profile-code" title="Your community code name">{{ current_codename }}</span>
+        {% endif %}
       </span>
       <a class="sd-profile-link" href="{% if user.is_superuser %}{% url 'team_management' %}{% else %}{% url 'my_account' %}{% endif %}" aria-label="Account settings">
         <i class="fas fa-gear" aria-hidden="true"></i>
@@ -41,11 +44,11 @@
     <nav class="sd-nav" aria-label="Main navigation">
       {% if user.is_superuser %}
       <span class="sd-nav-label">Administration</span>
-      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'team_dashboard' %}active{% endif %}"
-         href="{% url 'team_dashboard' %}"
-         {% if request.resolver_match.url_name == 'team_dashboard' %}aria-current="page"{% endif %}>
-        <span class="sd-nav-icon"><i class="fas fa-table-cells-large" aria-hidden="true"></i></span>
-        <span class="nav-link-title">Overview</span>
+      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'team_management' %}active{% endif %}"
+         href="{% url 'team_management' %}"
+         {% if request.resolver_match.url_name == 'team_management' %}aria-current="page"{% endif %}>
+        <span class="sd-nav-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
+        <span class="nav-link-title">Team tools</span>
       </a>
       <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}"
          href="{% url 'admin_dashboard' %}"
@@ -72,12 +75,6 @@
          {% if request.resolver_match.app_name == 'users' %}aria-current="page"{% endif %}>
         <span class="sd-nav-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
         <span class="nav-link-title">Users</span>
-      </a>
-      <a class="sd-nav-link nav-link {% if request.resolver_match.url_name == 'team_management' %}active{% endif %}"
-         href="{% url 'team_management' %}"
-         {% if request.resolver_match.url_name == 'team_management' %}aria-current="page"{% endif %}>
-        <span class="sd-nav-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
-        <span class="nav-link-title">Team tools</span>
       </a>
       {% else %}
       <span class="sd-nav-label">Workspace</span>

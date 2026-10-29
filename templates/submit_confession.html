@@ -6,6 +6,9 @@
 
 {% block page_actions %}
 <span class="sd-badge is-muted"><i class="fas fa-lock" aria-hidden="true"></i>Anonymous by default</span>
+{% if user.is_authenticated and not user.is_superuser %}
+<span class="sd-badge"><i class="fas fa-user-secret" aria-hidden="true"></i>Posting as {{ current_codename }}</span>
+{% endif %}
 {% if user.is_authenticated %}
 <a href="{% url 'my_reports' %}" class="sd-btn sd-btn-soft">
   <i class="fas fa-clipboard-list" aria-hidden="true"></i><span>My reports</span>
@@ -51,6 +54,12 @@
     </a>
   </div>
   {% endif %}
+  {% if submission_codename %}
+  <div class="sd-note" style="text-align: left; margin-bottom: 18px;">
+    <i class="fas fa-user-secret" aria-hidden="true"></i>
+    <div>This confession appears as <strong>{{ submission_codename }}</strong>. That is the code name other students will see.</div>
+  </div>
+  {% endif %}
 </section>
 {% else %}
 <div class="sd-form-layout">
@@ -92,6 +101,15 @@
           </span>
         </label>
       </div>
+
+      {% if user.is_authenticated and not user.is_superuser %}
+      <div class="sd-form-section">
+        <div class="sd-note">
+          <i class="fas fa-user-secret" aria-hidden="true"></i>
+          <div>Your confession will appear under <strong>{{ current_codename }}</strong>. Your username stays private.</div>
+        </div>
+      </div>
+      {% endif %}
 
       {% if user.is_authenticated %}
       <div class="sd-form-section">

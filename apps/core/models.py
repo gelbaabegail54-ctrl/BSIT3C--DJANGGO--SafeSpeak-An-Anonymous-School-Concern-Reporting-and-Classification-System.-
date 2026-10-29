@@ -9,6 +9,8 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from .codenames import comment_codename, report_codename, user_codename
+
 
 class Category(models.Model):
     """Classification category for concerns (e.g., bullying, facilities)."""
@@ -72,6 +74,7 @@ class Concern(models.Model):
         blank=True,
         related_name='filed_concerns',
     )
+    poster_codename = models.CharField(max_length=50, blank=True, editable=False)
     nlp_suggested_category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -93,6 +96,17 @@ class Concern(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def codename(self):
+        """Return the public code name shown instead of an identity."""
+        if self.poster_codename:
+            return self.poster_codename
+        if self.submitted_by_id:
+            return user_codename(self.submitted_by_id)
+        if self.pk is None:
+            return 'Anonymous'
+        return report_codename('concern', self.pk)
 
 
 class ConcernNote(models.Model):
@@ -201,6 +215,7 @@ class Confession(models.Model):
         blank=True,
         related_name='filed_confessions',
     )
+    poster_codename = models.CharField(max_length=50, blank=True, editable=False)
     nlp_suggested_category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -222,6 +237,17 @@ class Confession(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def codename(self):
+        """Return the public code name shown instead of an identity."""
+        if self.poster_codename:
+            return self.poster_codename
+        if self.submitted_by_id:
+            return user_codename(self.submitted_by_id)
+        if self.pk is None:
+            return 'Anonymous'
+        return report_codename('confession', self.pk)
 
 
 def report_image_upload_path(instance, filename):
@@ -430,3 +456,12 @@ class ReportComment(models.Model):
         if report is None:
             return 'Orphan comment'
         return f'Comment on {report}'
+
+    @property
+    def codename(self):
+        """Return the public code name shown instead of an identity."""
+        if self.author_id:
+            return user_codename(self.author_id)
+        if self.pk is None:
+            return 'Anonymous'
+        return comment_codename(self.pk)
