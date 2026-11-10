@@ -35,11 +35,11 @@
 
         {% if user.is_superuser %}
         <li class="nav-item mb-1">
-          <a class="nav-link {% if request.resolver_match.url_name == 'team_dashboard' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}" href="{% url 'team_dashboard' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'team_management' or request.resolver_match.url_name == 'admin_report_detail' %}active{% endif %}" href="{% url 'team_management' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-people-group"></i>
             </span>
-            <span class="nav-link-title">Team Dashboard</span>
+            <span class="nav-link-title">Team tools</span>
           </a>
         </li>
         <li class="nav-item">

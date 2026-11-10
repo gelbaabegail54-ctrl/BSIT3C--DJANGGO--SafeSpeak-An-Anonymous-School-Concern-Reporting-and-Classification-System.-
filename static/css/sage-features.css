@@ -1841,103 +1841,12 @@
   font-weight: 700;
 }
 
-/* ---------- NLP workspace ---------- */
-.sd-meter {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--sd-sage-100);
-}
-
-.sd-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--sd-sage-600);
-  transition: width 0.25s ease;
-}
-
-.sd-meter.is-good > span {
-  background: #5f9470;
-}
-
-.sd-meter.is-warn > span {
-  background: var(--sd-amber);
-}
-
-.sd-meter.is-low > span {
-  background: var(--sd-rose);
-}
-
-.sd-keyword {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 4px 4px 0;
-  padding: 3px 7px;
-  border: 1px solid var(--sd-line);
-  border-radius: 7px;
-  background: var(--sd-sage-50);
-  color: var(--sd-muted);
-  font-size: 8.5px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.sd-suggestion {
-  min-width: 145px;
-}
-
-.sd-score-row {
-  display: grid;
-  grid-template-columns: minmax(70px, 1fr) minmax(60px, 1.5fr) 35px;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 7px;
-  color: var(--sd-ink-soft);
-  font-size: 9px;
-}
-
-.sd-score-row:last-child {
-  margin-bottom: 0;
-}
-
-.sd-score-bar {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--sd-sage-100);
-}
-
-.sd-score-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--sd-sage-600);
-}
-
-.sd-sample-card {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(122, 155, 130, 0.12), transparent 45%),
-    #ffffff;
-}
-
-.sd-sample-result {
-  margin-top: 12px;
-  padding: 13px;
-  border: 1px solid var(--sd-line);
-  border-radius: 14px;
-  background: var(--sd-sage-50);
-}
-
+/* ---------- Helper text ---------- */
 .sd-note-text {
   margin: 0;
   color: var(--sd-muted);
   font-size: 9.5px;
   line-height: 1.65;
-}
-
-.sd-page .collapse form {
-  background: var(--sd-sage-50) !important;
 }
 
 /* ---------- Modals ---------- */
@@ -2236,6 +2145,11 @@ body.sd-auth-body {
   color: var(--sd-sage-700);
   font-weight: 750;
   text-decoration: none;
+}
+
+.sd-auth-guest-btn {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .sd-auth-note {

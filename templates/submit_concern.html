@@ -82,6 +82,21 @@
       </div>
 
       <div class="sd-form-section">
+        <label class="form-label required" for="concern-category">Category</label>
+        <select class="form-select" id="concern-category" name="category" required>
+          <option value="" {% if not form_category %}selected{% endif %} disabled>Select a category...</option>
+          {% for category in categories %}
+          <option value="{{ category.pk }}" {% if form_category == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
+          {% endfor %}
+        </select>
+        {% if categories %}
+        <div class="form-text">Choose the category that best fits your concern. Administrators can adjust it during review.</div>
+        {% else %}
+        <div class="form-text">No categories are available yet. Please contact an administrator.</div>
+        {% endif %}
+      </div>
+
+      <div class="sd-form-section">
         <label class="form-label" for="images">Attach images <span class="text-muted fw-normal">(optional)</span></label>
         <div class="sd-upload-box">
           <input class="form-control" type="file" name="images" id="images" accept="image/jpeg,image/png,image/webp" multiple>

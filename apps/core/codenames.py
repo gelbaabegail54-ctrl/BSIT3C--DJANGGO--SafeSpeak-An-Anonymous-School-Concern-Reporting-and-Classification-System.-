@@ -66,9 +66,22 @@ def _codename(seed):
     return f'{adjective} {noun} {number}'
 
 
+def generated_user_codename(user_id):
+    """Return the default code name generated for a user."""
+    return _codename(f'user:{user_id}')
+
+
 def user_codename(user_id):
     """Return the code name a regular user posts under."""
-    return _codename(f'user:{user_id}')
+    from .models import UserCodeName
+
+    custom = (
+        UserCodeName.objects
+        .filter(user_id=user_id)
+        .values_list('name', flat=True)
+        .first()
+    )
+    return custom or generated_user_codename(user_id)
 
 
 def report_codename(kind, report_id):

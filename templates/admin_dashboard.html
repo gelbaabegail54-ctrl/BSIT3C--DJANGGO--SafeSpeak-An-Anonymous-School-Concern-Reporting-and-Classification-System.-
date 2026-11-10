@@ -147,7 +147,7 @@
           <h2 class="sd-card-title" id="sd-categories-title">Categories</h2>
           <p class="sd-card-sub">Folders for the topics students are talking about.</p>
         </div>
-        <a href="{% url 'nlp_hub' %}" class="sd-link">Tune model <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+        <a href="{% url 'admin:core_category_changelist' %}" class="sd-link">Manage categories <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
       </div>
 
       {% if category_folders %}
@@ -162,7 +162,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="sd-folder-empty">No active categories yet. Add categories in the NLP workspace.</div>
+      <div class="sd-folder-empty">No active categories yet. <a href="{% url 'admin:core_category_changelist' %}" class="sd-link">Add a category</a> so students can classify their reports.</div>
       {% endif %}
     </section>
 

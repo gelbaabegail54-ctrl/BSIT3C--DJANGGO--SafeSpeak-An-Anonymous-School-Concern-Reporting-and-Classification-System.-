@@ -1033,6 +1033,27 @@ html {
   border-color: rgba(var(--tblr-primary-rgb), 0.55);
 }
 
+.dh-comment-signin {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--tblr-border-color);
+  border-radius: 0.75rem;
+  background: var(--tblr-bg-surface-secondary);
+  color: var(--tblr-muted);
+  font-size: 0.82rem;
+}
+
+.dh-comment-signin i {
+  color: var(--tblr-primary);
+}
+
+.dh-comment-signin a {
+  font-weight: 600;
+}
+
 @media (max-width: 991.98px) {
   .dh-feed-header {
     position: static;

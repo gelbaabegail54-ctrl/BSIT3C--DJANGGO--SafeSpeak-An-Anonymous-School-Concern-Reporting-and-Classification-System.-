@@ -9,9 +9,8 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.utils import timezone
 
-from apps.core.codenames import user_codename
+from apps.core.codenames import generated_user_codename, user_codename
 from apps.core.images import MAX_REPORT_IMAGES
 from apps.core.models import (
     AdminAction,
@@ -23,8 +22,8 @@ from apps.core.models import (
     Confession,
     ReportComment,
     ReportImage,
+    UserCodeName,
 )
-from apps.core.nlp import LOW_CONFIDENCE_THRESHOLD, classify_text
 from apps.core.views import log_admin_activity
 
 
@@ -51,12 +50,46 @@ class HomeViewTests(TestCase):
         self.assertContains(response, reverse('my_reports'))
         self.assertContains(response, 'You post as')
         self.assertContains(response, user_codename(user.pk))
+        self.assertContains(response, 'Browse by topic')
+        self.assertContains(response, 'Recent snapshots')
+        self.assertContains(response, 'Community resolution')
         self.assertNotContains(response, 'Your identity stays private')
 
-    def test_home_requires_login(self):
+    def test_home_is_public_and_shows_reports_and_comments(self):
+        author = get_user_model().objects.create_user(
+            username='feedauthor',
+            password='feedpass123',
+        )
+        category = Category.objects.create(name='General')
+        concern = Concern.objects.create(
+            title='A public concern',
+            description='Visible to guests in the community feed.',
+            category=category,
+        )
+        comment = ReportComment.objects.create(
+            concern=concern,
+            author=author,
+            body='A comment guests can read.',
+        )
+
         response = self.client.get(reverse('dashboard'))
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'home.html')
+        self.assertContains(response, concern.codename)
+        self.assertContains(response, comment.body)
+        self.assertNotContains(response, 'Browse the community')
+        self.assertNotContains(response, 'Browse by topic')
+        self.assertNotContains(response, 'Recent snapshots')
+        self.assertNotContains(response, 'Community resolution')
+        self.assertNotContains(response, 'Write a comment as')
+
+    def test_guest_sees_public_shell_without_personal_tracking(self):
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'sd-public-shell')
+        self.assertNotContains(response, 'Your latest reports')
 
 
 class AnonymousCodenameTests(TestCase):
@@ -119,6 +152,162 @@ class AnonymousCodenameTests(TestCase):
             self.assertContains(response, user_codename(self.user.pk))
 
 
+class CodeNameEditingTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='nightowl',
+            password='codepass123',
+        )
+        self.category = Category.objects.create(name='General')
+        self.generated_codename = generated_user_codename(self.user.pk)
+        self.client.force_login(self.user)
+
+    def test_account_page_offers_code_name_editing(self):
+        response = self.client.get(reverse('my_account'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Community code name')
+        self.assertContains(response, 'name="codename"')
+        self.assertContains(response, self.generated_codename)
+
+    def test_student_can_save_a_custom_code_name(self):
+        response = self.client.post(
+            reverse('my_account'),
+            {
+                'action': 'codename',
+                'codename': '  Night   Owl  ',
+            },
+        )
+
+        self.assertRedirects(response, reverse('my_account'))
+        self.assertEqual(user_codename(self.user.pk), 'Night Owl')
+        response = self.client.get(reverse('my_account'))
+        self.assertContains(response, 'Night Owl')
+        self.assertContains(response, 'Use generated name')
+
+    def test_custom_code_name_appears_on_new_reports(self):
+        UserCodeName.objects.create(user=self.user, name='Night Owl')
+
+        response = self.client.post(
+            reverse('submit_concern'),
+            {
+                'description': 'A broken chair in room 204.',
+                'category': self.category.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Concern.objects.get().poster_codename, 'Night Owl')
+
+    def test_custom_code_name_appears_on_new_comments(self):
+        UserCodeName.objects.create(user=self.user, name='Night Owl')
+        concern = Concern.objects.create(
+            title='A concern',
+            description='Something the community should see.',
+            category=self.category,
+        )
+
+        self.client.post(
+            reverse('add_comment', args=['concern', concern.pk]),
+            {'body': 'A supportive comment.'},
+        )
+
+        comment = ReportComment.objects.get()
+        self.assertEqual(comment.poster_codename, 'Night Owl')
+        self.assertEqual(comment.codename, 'Night Owl')
+
+    def test_changing_code_name_updates_linked_content(self):
+        concern = Concern.objects.create(
+            title='A linked concern',
+            description='Something the community should see.',
+            category=self.category,
+            submitted_by=self.user,
+            poster_codename=self.generated_codename,
+        )
+        confession = Confession.objects.create(
+            title='A linked confession',
+            description='Something the community should see.',
+            category=self.category,
+            submitted_by=self.user,
+            poster_codename=self.generated_codename,
+        )
+        comment = ReportComment.objects.create(
+            concern=concern,
+            author=self.user,
+            body='A supportive comment.',
+            poster_codename=self.generated_codename,
+        )
+        unlinked = Concern.objects.create(
+            title='An unlinked concern',
+            description='Something the community should see.',
+            category=self.category,
+            poster_codename=self.generated_codename,
+        )
+
+        self.client.post(
+            reverse('my_account'),
+            {
+                'action': 'codename',
+                'codename': 'Night Owl',
+            },
+        )
+
+        for report in (concern, confession):
+            report.refresh_from_db()
+            self.assertEqual(report.poster_codename, 'Night Owl')
+        comment.refresh_from_db()
+        self.assertEqual(comment.poster_codename, 'Night Owl')
+        unlinked.refresh_from_db()
+        self.assertEqual(unlinked.poster_codename, self.generated_codename)
+
+    def test_student_can_reset_to_the_generated_code_name(self):
+        UserCodeName.objects.create(user=self.user, name='Night Owl')
+
+        response = self.client.post(
+            reverse('my_account'),
+            {'action': 'reset_codename'},
+        )
+
+        self.assertRedirects(response, reverse('my_account'))
+        self.assertFalse(UserCodeName.objects.filter(user=self.user).exists())
+        self.assertEqual(user_codename(self.user.pk), self.generated_codename)
+
+    def test_code_name_must_be_unique(self):
+        other = get_user_model().objects.create_user(
+            username='otherstudent',
+            password='otherpass123',
+        )
+        UserCodeName.objects.create(user=other, name='Night Owl')
+
+        response = self.client.post(
+            reverse('my_account'),
+            {
+                'action': 'codename',
+                'codename': 'night owl',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'That code name is already in use.')
+        self.assertFalse(UserCodeName.objects.filter(user=self.user).exists())
+
+    def test_code_name_rejects_reserved_and_unsafe_values(self):
+        for value in ('Anonymous', 'admin', 'bad@name'):
+            with self.subTest(value=value):
+                response = self.client.post(
+                    reverse('my_account'),
+                    {
+                        'action': 'codename',
+                        'codename': value,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(
+                    UserCodeName.objects.filter(user=self.user).exists()
+                )
+
+
 class SupportPagesTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
@@ -148,7 +337,7 @@ class SupportPagesTests(TestCase):
         )
         self.client.force_login(admin)
 
-        response = self.client.get(reverse('team_dashboard'))
+        response = self.client.get(reverse('team_management'))
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, reverse('help_resources'))
@@ -288,7 +477,7 @@ class LoginRedirectTests(TestCase):
             password='testpass123',
         )
 
-    def test_administrator_lands_on_team_dashboard(self):
+    def test_administrator_lands_on_team_management(self):
         response = self.client.post(
             reverse('login'),
             {'username': 'loginadmin', 'password': 'adminpass123'},
@@ -296,7 +485,7 @@ class LoginRedirectTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('team_dashboard'),
+            reverse('team_management'),
             fetch_redirect_response=False,
         )
 
@@ -333,7 +522,7 @@ class LoginRedirectTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('team_dashboard'),
+            reverse('team_management'),
             fetch_redirect_response=False,
         )
 
@@ -375,6 +564,18 @@ class ReportCommentTests(TestCase):
         )
         self.assertTrue(
             ReportComment.objects.filter(concern=self.concern, body='A new comment').exists()
+        )
+
+    def test_guest_cannot_add_comment(self):
+        response = self.client.post(
+            reverse('add_comment', args=['concern', self.concern.pk]),
+            {'body': 'A guest comment'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+        self.assertFalse(
+            ReportComment.objects.filter(body='A guest comment').exists()
         )
 
     def test_superuser_comment_is_logged(self):
@@ -704,8 +905,30 @@ class AdminActivityHistoryTests(TestCase):
         self.assertContains(response, 'Admin activity history')
 
 
+class ReportingRequiresLoginTests(TestCase):
+    def test_guests_are_redirected_to_login_before_reporting(self):
+        for url_name in ('submit_concern', 'submit_confession'):
+            url = reverse(url_name)
+
+            for response in (
+                self.client.get(url),
+                self.client.post(url, {'description': 'A guest report.'}),
+            ):
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(reverse('login'), response.url)
+
+        self.assertFalse(Concern.objects.exists())
+        self.assertFalse(Confession.objects.exists())
+
+
 class EmergencyBannerTests(TestCase):
-    def test_anonymous_reporting_forms_show_emergency_banner(self):
+    def test_reporting_forms_show_emergency_banner(self):
+        user = get_user_model().objects.create_user(
+            username='banneruser',
+            password='bannerpass123',
+        )
+        self.client.force_login(user)
+
         for url in (reverse('submit_concern'), reverse('submit_confession')):
             response = self.client.get(url)
 
@@ -715,10 +938,24 @@ class EmergencyBannerTests(TestCase):
 
 
 class ReportSubmissionActivityTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='submitter',
+            password='submitpass123',
+        )
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(
+            name='Facilities',
+            description='Buildings, equipment, and campus maintenance.',
+        )
+
     def test_concern_submission_is_logged_anonymously(self):
         response = self.client.post(
             reverse('submit_concern'),
-            {'description': 'The cafeteria sink is leaking near the serving counter.'},
+            {
+                'description': 'The cafeteria sink is leaking near the serving counter.',
+                'category': self.category.pk,
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -736,7 +973,10 @@ class ReportSubmissionActivityTests(TestCase):
     def test_confession_submission_is_logged_anonymously(self):
         response = self.client.post(
             reverse('submit_confession'),
-            {'description': 'I feel overwhelmed by the workload this semester.'},
+            {
+                'description': 'I feel overwhelmed by the workload this semester.',
+                'category': self.category.pk,
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -746,10 +986,50 @@ class ReportSubmissionActivityTests(TestCase):
         self.assertIsNone(log.concern_id)
         self.assertEqual(log.detail, 'Anonymous confession submitted.')
 
+    def test_submission_requires_a_category(self):
+        response = self.client.post(
+            reverse('submit_concern'),
+            {'description': 'A broken chair in room 204.'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Select a category for this concern.')
+        self.assertFalse(Concern.objects.exists())
+
+    def test_submission_uses_the_selected_category(self):
+        self.client.post(
+            reverse('submit_concern'),
+            {
+                'description': 'A broken chair in room 204.',
+                'category': self.category.pk,
+            },
+        )
+
+        self.assertEqual(Concern.objects.get().category, self.category)
+
+    def test_selected_category_is_preserved_after_a_validation_error(self):
+        response = self.client.post(
+            reverse('submit_concern'),
+            {
+                'description': '',
+                'category': self.category.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<option value="{self.category.pk}" selected>',
+        )
+        self.assertFalse(Concern.objects.exists())
+
     def test_submission_activity_appears_in_history(self):
         self.client.post(
             reverse('submit_concern'),
-            {'description': 'A broken chair in room 204.'},
+            {
+                'description': 'A broken chair in room 204.',
+                'category': self.category.pk,
+            },
         )
         admin = get_user_model().objects.create_superuser(
             username='historyadmin',
@@ -772,6 +1052,12 @@ class ReportImageUploadTests(TestCase):
         media_override = override_settings(MEDIA_ROOT=self.media_root)
         media_override.enable()
         self.addCleanup(media_override.disable)
+        self.user = get_user_model().objects.create_user(
+            username='imageuploader',
+            password='imagepass123',
+        )
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(name='Facilities')
 
     def _make_concern(self, submitted_by=None):
         category = Category.objects.create(name='General')
@@ -800,6 +1086,7 @@ class ReportImageUploadTests(TestCase):
             reverse('submit_concern'),
             {
                 'description': 'Broken window in the science lab.',
+                'category': self.category.pk,
                 'images': [
                     uploaded_png('front-view.png'),
                     uploaded_png('side-view.png'),
@@ -824,6 +1111,7 @@ class ReportImageUploadTests(TestCase):
             reverse('submit_confession'),
             {
                 'description': 'I feel overwhelmed by the workload this semester.',
+                'category': self.category.pk,
                 'images': [uploaded_png('note.png')],
             },
         )
@@ -839,6 +1127,7 @@ class ReportImageUploadTests(TestCase):
             reverse('submit_concern'),
             {
                 'description': 'Something happened in the hallway.',
+                'category': self.category.pk,
                 'images': [
                     SimpleUploadedFile(
                         'notes.txt',
@@ -863,6 +1152,7 @@ class ReportImageUploadTests(TestCase):
             reverse('submit_concern'),
             {
                 'description': 'There are several broken chairs in room 204.',
+                'category': self.category.pk,
                 'images': [
                     uploaded_png(f'image-{index}.png')
                     for index in range(MAX_REPORT_IMAGES + 1)
@@ -889,6 +1179,7 @@ class ReportImageUploadTests(TestCase):
             reverse('submit_concern'),
             {
                 'description': 'A large photo of the damaged ceiling.',
+                'category': self.category.pk,
                 'images': [oversized],
             },
         )
@@ -938,7 +1229,7 @@ class ReportImageUploadTests(TestCase):
         self.assertContains(response, 'Attached images')
 
 
-class TeamDashboardTests(TestCase):
+class TeamManagementTests(TestCase):
     def setUp(self):
         self.admin = get_user_model().objects.create_superuser(
             username='teamadmin',
@@ -960,55 +1251,10 @@ class TeamDashboardTests(TestCase):
             description='A confession for the team queue.',
             category=self.category,
         )
-        self.team_url = reverse('team_dashboard')
         self.management_url = reverse('team_management')
         self.detail_url = reverse(
             'admin_report_detail', args=['concern', self.concern.pk]
         )
-
-    def test_team_dashboard_requires_administrator_access(self):
-        anonymous = self.client.get(self.team_url)
-        self.assertEqual(anonymous.status_code, 302)
-        self.assertIn(reverse('login'), anonymous.url)
-
-        self.client.force_login(self.user)
-        response = self.client.get(self.team_url)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('dashboard'), response.url)
-
-    def test_administrator_can_view_team_dashboard(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.get(self.team_url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'team_dashboard.html')
-        self.assertContains(response, 'Team Dashboard')
-        self.assertContains(response, 'NLP categorization workspace')
-        self.assertContains(response, 'Reports analyzed')
-        self.assertContains(response, 'Classification review')
-        self.assertContains(response, 'Category model')
-        self.assertContains(response, self.concern.title)
-        self.assertContains(response, self.confession.title)
-        self.assertContains(response, reverse('admin_dashboard'))
-        self.assertNotContains(response, reverse('nlp_hub'))
-        self.assertContains(response, reverse('admin_activity_history'))
-        self.assertContains(response, reverse('users:user_list'))
-        self.assertNotContains(response, reverse('my_reports'))
-        self.assertNotContains(response, '<span class="nav-link-title">Dashboard</span>')
-
-    def test_team_dashboard_can_run_nlp_analysis(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.team_url,
-            {'action': 'analyze_all'},
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(self.team_url, response.url)
-        self.concern.refresh_from_db()
-        self.assertIsNotNone(self.concern.nlp_analyzed_at)
 
     def test_management_requires_administrator_access(self):
         anonymous = self.client.get(self.management_url)
@@ -1028,24 +1274,24 @@ class TeamDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'team_management.html')
         self.assertContains(response, 'Manage Reports')
-        self.assertContains(response, 'NLP categorization hub')
+        self.assertContains(response, 'Categories')
         self.assertContains(response, 'Activity history')
         self.assertContains(response, 'Users')
         self.assertContains(response, reverse('admin_dashboard'))
-        self.assertContains(response, reverse('nlp_hub'))
+        self.assertContains(
+            response, reverse('admin:core_category_changelist')
+        )
         self.assertContains(response, reverse('admin_activity_history'))
         self.assertContains(response, reverse('users:user_list'))
         self.assertTrue(response.context['can_manage_users'])
         self.assertIn('user_count', response.context)
-        self.assertIn('nlp_category_count', response.context)
+        self.assertIn('category_count', response.context)
 
     def test_regular_user_cannot_access_administrator_tools(self):
         self.client.force_login(self.user)
 
         for url in (
-            reverse('team_dashboard'),
             reverse('team_management'),
-            reverse('nlp_hub'),
             reverse('admin_dashboard'),
             reverse('admin_activity_history'),
             reverse('users:user_list'),
@@ -1127,292 +1373,15 @@ class TeamDashboardTests(TestCase):
             ).exists()
         )
 
-    def test_report_detail_links_back_to_team_dashboard(self):
+    def test_report_detail_links_back_to_reports_queue(self):
         self.client.force_login(self.admin)
 
         response = self.client.get(self.detail_url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, reverse('team_dashboard'))
+        self.assertContains(response, reverse('admin_dashboard'))
         self.assertContains(response, reverse('admin_activity_history'))
         self.assertContains(response, 'View all')
-
-class NLPEngineTests(TestCase):
-    def test_empty_library_uses_builtin_model(self):
-        result = classify_text('I am being bullied and threatened at school.')
-
-        self.assertTrue(result.matched)
-        self.assertEqual(result.category.name, 'Bullying')
-        self.assertGreaterEqual(result.confidence, LOW_CONFIDENCE_THRESHOLD)
-        self.assertIn('threat', result.signals)
-
-    def test_no_signal_returns_fallback(self):
-        result = classify_text('The quick brown fox jumps over the lazy dog.')
-
-        self.assertFalse(result.matched)
-        self.assertIsNone(result.category)
-        self.assertEqual(result.confidence, 0)
-        self.assertEqual(result.signals, [])
-
-    def test_phrase_keywords_match_word_sequences(self):
-        Category.objects.create(
-            name='Health',
-            keywords='mental health, panic attack',
-        )
-
-        result = classify_text('I think I had a panic attack before class.')
-
-        self.assertTrue(result.matched)
-        self.assertEqual(result.category.name, 'Health')
-        self.assertIn('panic attack', result.signals)
-
-    def test_custom_category_keywords_drive_prediction(self):
-        Category.objects.create(
-            name='Health',
-            keywords='clinic*, nurse*, medicine*',
-        )
-
-        result = classify_text('I need to visit the clinic for my medicine.')
-
-        self.assertTrue(result.matched)
-        self.assertEqual(result.category.name, 'Health')
-        self.assertIn('clinic', result.signals)
-
-    def test_prefix_matching_requires_wildcard(self):
-        Category.objects.create(name='Facilities', keywords='class')
-
-        result = classify_text('The classroom projector is broken.')
-
-        self.assertFalse(result.matched)
-
-
-class NLPCategorizationHubTests(TestCase):
-    def setUp(self):
-        self.admin = get_user_model().objects.create_superuser(
-            username='nlpadmin',
-            email='nlpadmin@example.com',
-            password='adminpass123',
-        )
-        self.user = get_user_model().objects.create_user(
-            username='nlpuser',
-            password='userpass123',
-        )
-        self.general = Category.objects.create(name='General')
-        self.facilities = Category.objects.create(
-            name='Facilities',
-            keywords='leak*, roof*, classroom*, broken',
-        )
-        self.bullying = Category.objects.create(
-            name='Bullying',
-            keywords='bully*, harass*, threat*',
-        )
-        self.concern = Concern.objects.create(
-            title='Leaking classroom roof',
-            description='The classroom roof is leaking in heavy rain.',
-            category=self.general,
-        )
-        self.confession = Confession.objects.create(
-            title='Feeling overwhelmed',
-            description='I feel stressed and anxious about my exams.',
-            category=self.general,
-        )
-        self.url = reverse('nlp_hub')
-
-    def test_hub_requires_administrator_access(self):
-        anonymous = self.client.get(self.url)
-        self.assertEqual(anonymous.status_code, 302)
-        self.assertIn(reverse('login'), anonymous.url)
-
-        self.client.force_login(self.user)
-        regular = self.client.get(self.url)
-        self.assertEqual(regular.status_code, 302)
-        self.assertIn(reverse('dashboard'), regular.url)
-
-        self.client.force_login(self.admin)
-        administrator = self.client.get(self.url)
-        self.assertEqual(administrator.status_code, 200)
-
-    def test_administrator_can_view_hub(self):
-        self.concern.nlp_suggested_category = self.facilities
-        self.concern.nlp_confidence = 86
-        self.concern.nlp_signals = 'roof, leak'
-        self.concern.nlp_analyzed_at = timezone.now()
-        self.concern.save()
-
-        self.client.force_login(self.admin)
-        response = self.client.get(self.url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'nlp_hub.html')
-        self.assertContains(response, 'NLP categorization hub')
-        self.assertContains(response, 'Classification review')
-        self.assertContains(response, 'Category model')
-        self.assertContains(response, self.concern.title)
-        self.assertContains(response, 'Facilities')
-        self.assertContains(response, '86%')
-
-    def test_analyze_report_action_persists_result(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.url,
-            {
-                'action': 'analyze_report',
-                'kind': 'concern',
-                'pk': self.concern.pk,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(self.url, response.url)
-        self.concern.refresh_from_db()
-        self.assertIsNotNone(self.concern.nlp_analyzed_at)
-        self.assertEqual(self.concern.nlp_suggested_category_id, self.facilities.pk)
-        self.assertGreaterEqual(
-            self.concern.nlp_confidence,
-            LOW_CONFIDENCE_THRESHOLD,
-        )
-        self.assertIn('leak', self.concern.nlp_signals)
-
-    def test_analyze_all_updates_every_report(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(self.url, {'action': 'analyze_all'})
-
-        self.assertEqual(response.status_code, 302)
-        self.concern.refresh_from_db()
-        self.confession.refresh_from_db()
-        self.assertIsNotNone(self.concern.nlp_analyzed_at)
-        self.assertIsNotNone(self.confession.nlp_analyzed_at)
-        self.assertEqual(self.concern.nlp_suggested_category_id, self.facilities.pk)
-
-    def test_apply_suggestion_reclassifies_and_logs_activity(self):
-        self.concern.nlp_suggested_category = self.facilities
-        self.concern.nlp_confidence = 88
-        self.concern.nlp_signals = 'leak, roof'
-        self.concern.nlp_analyzed_at = timezone.now()
-        self.concern.save()
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.url,
-            {
-                'action': 'apply',
-                'kind': 'concern',
-                'pk': self.concern.pk,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.concern.refresh_from_db()
-        self.assertEqual(self.concern.category_id, self.facilities.pk)
-        log = AdminActivityLog.objects.get(action=AdminAction.CATEGORY_CHANGED)
-        self.assertEqual(log.actor, self.admin)
-        self.assertEqual(log.concern, self.concern)
-        self.assertEqual(log.old_value, 'General')
-        self.assertEqual(log.new_value, 'Facilities')
-
-    def test_analyze_sample_renders_prediction(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.url,
-            {
-                'action': 'analyze_sample',
-                'sample_text': 'I am being bullied and threatened by a classmate.',
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNotNone(response.context['sample'])
-        self.assertEqual(response.context['sample']['category'], 'Bullying')
-        self.assertContains(response, 'Matched signals')
-        self.assertContains(response, 'bullied')
-
-    def test_create_category_with_keywords(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.url,
-            {
-                'action': 'create_category',
-                'name': 'Health',
-                'description': 'Clinic and medical concerns.',
-                'keywords': 'nurse*, clinic*, medicine*',
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('#categories', response.url)
-        category = Category.objects.get(name='Health')
-        self.assertEqual(category.keywords, 'nurse*, clinic*, medicine*')
-        self.assertTrue(
-            AdminActivityLog.objects.filter(
-                actor=self.admin,
-                action=AdminAction.CATEGORY_CREATED,
-                detail='Created the "Health" category.',
-            ).exists()
-        )
-
-    def test_update_category_keywords_and_status(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(
-            self.url,
-            {
-                'action': 'update_category',
-                'category_id': self.facilities.pk,
-                'name': 'Facilities',
-                'description': 'Campus maintenance and utilities.',
-                'keywords': 'leak*, flood*, broken',
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.facilities.refresh_from_db()
-        self.assertEqual(self.facilities.keywords, 'leak*, flood*, broken')
-        self.assertFalse(self.facilities.is_active)
-        self.assertTrue(
-            AdminActivityLog.objects.filter(
-                actor=self.admin,
-                action=AdminAction.CATEGORY_UPDATED,
-            ).exists()
-        )
-
-    def test_seed_defaults_adds_missing_categories(self):
-        self.client.force_login(self.admin)
-
-        response = self.client.post(self.url, {'action': 'seed_defaults'})
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(Category.objects.filter(name='Safety').exists())
-        self.assertTrue(Category.objects.filter(name='Academic').exists())
-        self.assertTrue(Category.objects.filter(name='Personal').exists())
-        self.assertFalse(Category.objects.filter(name='Bullying').count() > 1)
-
-    def test_regular_user_cannot_run_nlp_actions(self):
-        self.client.force_login(self.user)
-
-        response = self.client.post(self.url, {'action': 'analyze_all'})
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('dashboard'), response.url)
-        self.concern.refresh_from_db()
-        self.assertIsNone(self.concern.nlp_analyzed_at)
-
-    def test_submission_stores_nlp_metadata(self):
-        response = self.client.post(
-            reverse('submit_concern'),
-            {'description': 'The classroom roof is leaking in heavy rain.'},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        concern = Concern.objects.get(title='The classroom roof is leaking in heavy rain.')
-        self.assertEqual(concern.category_id, self.facilities.pk)
-        self.assertEqual(concern.nlp_suggested_category_id, self.facilities.pk)
-        self.assertGreaterEqual(concern.nlp_confidence, LOW_CONFIDENCE_THRESHOLD)
-        self.assertIsNotNone(concern.nlp_analyzed_at)
-        self.assertIn('leak', concern.nlp_signals)
 
 
 class ReportAccountLinkTests(TestCase):
@@ -1421,6 +1390,7 @@ class ReportAccountLinkTests(TestCase):
             username='trackedreporter',
             password='testpass123',
         )
+        self.category = Category.objects.create(name='General')
         self.concern_url = reverse('submit_concern')
         self.confession_url = reverse('submit_confession')
 
@@ -1430,7 +1400,10 @@ class ReportAccountLinkTests(TestCase):
         for url_name in ('submit_concern', 'submit_confession'):
             response = self.client.post(
                 reverse(url_name),
-                {'description': 'A report shared without linking my account.'},
+                {
+                    'description': 'A report shared without linking my account.',
+                    'category': self.category.pk,
+                },
             )
 
             report_model = (
@@ -1444,28 +1417,29 @@ class ReportAccountLinkTests(TestCase):
             self.assertEqual(report.codename, user_codename(self.user.pk))
             self.assertContains(response, report.codename)
 
-    def test_anonymous_concern_ignores_link_option(self):
+    def test_anonymous_concern_is_redirected_to_login(self):
         response = self.client.post(
             self.concern_url,
             {
                 'description': 'The gym roof is leaking during heavy rain.',
+                'category': self.category.pk,
                 'link_to_account': 'on',
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        concern = Concern.objects.get(
-            title='The gym roof is leaking during heavy rain.'
-        )
-        self.assertIsNone(concern.submitted_by)
-        self.assertFalse(response.context['linked_to_account'])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+        self.assertFalse(Concern.objects.exists())
 
     def test_logged_in_concern_is_anonymous_by_default(self):
         self.client.force_login(self.user)
 
         response = self.client.post(
             self.concern_url,
-            {'description': 'A broken chair in room 204 is unsafe.'},
+            {
+                'description': 'A broken chair in room 204 is unsafe.',
+                'category': self.category.pk,
+            },
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1481,6 +1455,7 @@ class ReportAccountLinkTests(TestCase):
             self.concern_url,
             {
                 'description': 'The laboratory sink has been leaking for a week.',
+                'category': self.category.pk,
                 'link_to_account': 'on',
             },
         )
@@ -1502,6 +1477,7 @@ class ReportAccountLinkTests(TestCase):
             self.confession_url,
             {
                 'description': 'I feel overwhelmed by the workload this semester.',
+                'category': self.category.pk,
                 'link_to_account': 'on',
             },
         )
@@ -1516,7 +1492,8 @@ class ReportAccountLinkTests(TestCase):
 
     def test_link_option_is_only_shown_to_authenticated_users(self):
         anonymous = self.client.get(self.concern_url)
-        self.assertNotContains(anonymous, 'name="link_to_account"')
+        self.assertEqual(anonymous.status_code, 302)
+        self.assertIn(reverse('login'), anonymous.url)
 
         self.client.force_login(self.user)
         authenticated = self.client.get(self.concern_url)

@@ -9,8 +9,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
-from django.db import transaction
-from django.db.models import Avg, Count, F, Q
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import redirect, render, get_object_or_404
@@ -21,7 +21,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.urls import reverse
 from apps.users.views import _is_superuser
 
-from .codenames import user_codename
+from .codenames import generated_user_codename, user_codename
+from .forms import CodeNameForm
 from .models import (
     AdminAction,
     AdminActivityLog,
@@ -34,16 +35,9 @@ from .models import (
     ConfessionResponse,
     ReportComment,
     ReportImage,
+    UserCodeName,
 )
 from .images import MAX_REPORT_IMAGES, prepare_report_images
-from .nlp import (
-    DEFAULT_CATEGORY_KEYWORDS,
-    LOW_CONFIDENCE_THRESHOLD,
-    classify_text,
-    default_description,
-    default_keywords,
-    parse_keywords,
-)
 
 User = get_user_model()
 
@@ -161,7 +155,7 @@ def _login_redirect_url(request, user):
     ):
         return next_url
     if user.is_superuser:
-        return reverse('team_dashboard')
+        return reverse('team_management')
     return reverse('dashboard')
 
 
@@ -243,69 +237,16 @@ def _derive_title(description):
     return snippet
 
 
-def _general_category():
-    """Return the fallback category used when no NLP signal is found."""
-    return Category.objects.get_or_create(
-        name='General',
-        defaults={'description': 'Automatically assigned when no other category matches.'},
-    )[0]
+def _submission_categories():
+    """Return the categories a reporter can choose from."""
+    return Category.objects.filter(is_active=True)
 
 
-def _resolve_nlp_category(category):
-    """Return a saved category for an NLP result, creating it if needed."""
-    if category is None:
+def _selected_category(raw_category):
+    """Return the active category matching a submitted id, or None."""
+    if not str(raw_category or '').isdigit():
         return None
-    if category.pk:
-        return category
-
-    existing = Category.objects.filter(name__iexact=category.name).first()
-    if existing is not None:
-        return existing
-
-    return Category.objects.create(
-        name=category.name,
-        description=getattr(category, 'description', '') or default_description(category.name),
-        keywords=(
-            getattr(category, 'keywords', '')
-            or ', '.join(default_keywords(category.name))
-        ),
-    )
-
-
-def _nlp_fields(result):
-    """Build model field values for a classification result."""
-    suggested = _resolve_nlp_category(result.category)
-    return {
-        'nlp_suggested_category': suggested,
-        'nlp_confidence': result.confidence,
-        'nlp_signals': ', '.join(result.signals[:6])[:255],
-        'nlp_analyzed_at': timezone.now(),
-    }
-
-
-def _classify_report(description):
-    """Classify a report and return its category plus the detailed result."""
-    result = classify_text(description)
-    category = (
-        _resolve_nlp_category(result.category)
-        if result.category is not None
-        else _general_category()
-    )
-    return category, result
-
-
-def _analyze_report_instance(report, categories=None):
-    """Run the NLP model against an existing report and persist the result."""
-    result = classify_text(report.description, categories=categories)
-    for field_name, value in _nlp_fields(result).items():
-        setattr(report, field_name, value)
-    report.save(update_fields=[
-        'nlp_suggested_category',
-        'nlp_confidence',
-        'nlp_signals',
-        'nlp_analyzed_at',
-    ])
-    return result
+    return Category.objects.filter(pk=raw_category, is_active=True).first()
 
 
 def _link_report_to_account(request):
@@ -315,15 +256,19 @@ def _link_report_to_account(request):
     return None
 
 
+@login_required(login_url='login')
 def submit_concern(request):
-    """Allow anonymous submission of a concern report."""
+    """Allow signed-in users to submit a concern report anonymously."""
     if request.method == 'GET':
         return render(request, 'submit_concern.html', {
             'max_images': MAX_REPORT_IMAGES,
+            'categories': _submission_categories(),
         })
 
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
+        category_id = request.POST.get('category', '').strip()
+        category = _selected_category(category_id)
         is_urgent = request.POST.get('is_urgent', '') == 'on'
         reporter = _link_report_to_account(request)
         images, image_errors = prepare_report_images(
@@ -332,7 +277,9 @@ def submit_concern(request):
 
         form_context = {
             'max_images': MAX_REPORT_IMAGES,
+            'categories': _submission_categories(),
             'form_description': description,
+            'form_category': category_id,
             'form_is_urgent': is_urgent,
             'form_link_to_account': request.POST.get('link_to_account') == 'on',
         }
@@ -346,13 +293,15 @@ def submit_concern(request):
                 messages.error(request, error)
             return render(request, 'submit_concern.html', form_context)
 
+        if category is None:
+            messages.error(request, 'Select a category for this concern.')
+            return render(request, 'submit_concern.html', form_context)
+
         with transaction.atomic():
-            category, nlp_result = _classify_report(description)
             concern = Concern.objects.create(
                 title=_derive_title(description),
                 description=description,
                 category=category,
-                **(_nlp_fields(nlp_result)),
                 location_on_campus='',
                 date_of_incident=None,
                 is_urgent=is_urgent,
@@ -391,15 +340,19 @@ def submit_concern(request):
         })
 
 
+@login_required(login_url='login')
 def submit_confession(request):
-    """Allow anonymous submission of a confession."""
+    """Allow signed-in users to submit a confession anonymously."""
     if request.method == 'GET':
         return render(request, 'submit_confession.html', {
             'max_images': MAX_REPORT_IMAGES,
+            'categories': _submission_categories(),
         })
 
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
+        category_id = request.POST.get('category', '').strip()
+        category = _selected_category(category_id)
         is_urgent = request.POST.get('is_urgent', '') == 'on'
         reporter = _link_report_to_account(request)
         images, image_errors = prepare_report_images(
@@ -408,7 +361,9 @@ def submit_confession(request):
 
         form_context = {
             'max_images': MAX_REPORT_IMAGES,
+            'categories': _submission_categories(),
             'form_description': description,
+            'form_category': category_id,
             'form_is_urgent': is_urgent,
             'form_link_to_account': request.POST.get('link_to_account') == 'on',
         }
@@ -422,13 +377,15 @@ def submit_confession(request):
                 messages.error(request, error)
             return render(request, 'submit_confession.html', form_context)
 
+        if category is None:
+            messages.error(request, 'Select a category for this confession.')
+            return render(request, 'submit_confession.html', form_context)
+
         with transaction.atomic():
-            category, nlp_result = _classify_report(description)
             confession = Confession.objects.create(
                 title=_derive_title(description),
                 description=description,
                 category=category,
-                **(_nlp_fields(nlp_result)),
                 location_on_campus='',
                 date_of_incident=None,
                 is_urgent=is_urgent,
@@ -677,6 +634,29 @@ def privacy_guidelines(request):
     return render(request, 'privacy_guidelines.html')
 
 
+def _apply_user_codename(user, name):
+    """Save or clear a custom code name and refresh the user's public posts."""
+    with transaction.atomic():
+        if name is None:
+            UserCodeName.objects.filter(user=user).delete()
+            name = generated_user_codename(user.pk)
+        else:
+            UserCodeName.objects.update_or_create(
+                user=user,
+                defaults={'name': name},
+            )
+        Concern.objects.filter(submitted_by=user).update(
+            poster_codename=name,
+        )
+        Confession.objects.filter(submitted_by=user).update(
+            poster_codename=name,
+        )
+        ReportComment.objects.filter(author=user).update(
+            poster_codename=name,
+        )
+    return name
+
+
 @login_required(login_url='login')
 def my_account(request):
     """Let a signed-in user review their profile and change their password."""
@@ -688,6 +668,11 @@ def my_account(request):
     }
     profile_errors = {}
     password_form = PasswordChangeForm(user)
+    code_name = UserCodeName.objects.filter(user=user).first()
+    codename_form = CodeNameForm(
+        user,
+        initial={'codename': code_name.name if code_name else ''},
+    )
 
     if request.method == 'POST':
         action = request.POST.get('action', '')
@@ -743,6 +728,34 @@ def my_account(request):
                 )
                 return redirect('my_account')
 
+        elif action == 'codename':
+            codename_form = CodeNameForm(user, data=request.POST)
+            if codename_form.is_valid():
+                try:
+                    name = _apply_user_codename(
+                        user,
+                        codename_form.cleaned_data['codename'],
+                    )
+                except IntegrityError:
+                    codename_form.add_error(
+                        'codename',
+                        'That code name is already in use.',
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'Your community code name is now {name}.',
+                    )
+                    return redirect('my_account')
+
+        elif action == 'reset_codename':
+            name = _apply_user_codename(user, None)
+            messages.success(
+                request,
+                f'Your community code name is back to {name}.',
+            )
+            return redirect('my_account')
+
         elif action == 'password':
             password_form = PasswordChangeForm(user, request.POST)
             if password_form.is_valid():
@@ -773,6 +786,9 @@ def my_account(request):
         'profile_values': profile_values,
         'profile_errors': profile_errors,
         'password_form': password_form,
+        'codename_form': codename_form,
+        'generated_codename': generated_user_codename(user.pk),
+        'has_custom_codename': code_name is not None,
         'role_label': 'Administrator' if user.is_superuser else 'User',
         'linked_count': concerns.count() + confessions.count(),
         'open_count': (
@@ -905,15 +921,6 @@ def admin_dashboard(request):
 
 @login_required(login_url='login')
 @user_passes_test(_is_team_member, login_url='dashboard')
-@never_cache
-@require_http_methods(['GET', 'POST'])
-def team_dashboard(request):
-    """Administrator landing page with the NLP categorization workspace."""
-    return _nlp_workspace(request, 'team_dashboard.html')
-
-
-@login_required(login_url='login')
-@user_passes_test(_is_team_member, login_url='dashboard')
 def team_management(request):
     """Hub for the SafeSpeak administrators' management tools."""
     closed_statuses = [ConcernStatus.RESOLVED, ConcernStatus.DISMISSED]
@@ -930,371 +937,9 @@ def team_management(request):
         'open_reports': open_reports,
         'activity_count': AdminActivityLog.objects.count(),
         'user_count': User.objects.count(),
-        'nlp_category_count': Category.objects.filter(is_active=True).count(),
+        'category_count': Category.objects.filter(is_active=True).count(),
     }
     return render(request, 'team_management.html', context)
-
-
-NLP_QUEUE_FILTERS = (
-    ('attention', 'Needs review'),
-    ('all', 'All reports'),
-)
-
-
-def _nlp_report_item(report, kind):
-    """Build the NLP review data for one concern or confession."""
-    suggestion = report.nlp_suggested_category
-    analyzed = report.nlp_analyzed_at is not None
-    confidence = round(report.nlp_confidence or 0)
-
-    return {
-        'kind': kind,
-        'kind_label': kind.title(),
-        'report': report,
-        'title': report.title,
-        'current_category': report.category.name,
-        'suggested_category': suggestion.name if suggestion is not None else '',
-        'confidence': confidence,
-        'signals': [
-            signal.strip()
-            for signal in report.nlp_signals.split(',')
-            if signal.strip()
-        ],
-        'analyzed': analyzed,
-        'mismatch': bool(
-            suggestion is not None and suggestion.pk != report.category_id
-        ),
-        'low_confidence': analyzed and confidence < LOW_CONFIDENCE_THRESHOLD,
-        'detail_url': reverse('admin_report_detail', args=[kind, report.pk]),
-        'submitted_at': report.submitted_at,
-    }
-
-
-def _nlp_queue_sort_key(item):
-    if item['mismatch']:
-        priority = 0
-    elif item['low_confidence']:
-        priority = 1
-    elif not item['analyzed']:
-        priority = 2
-    else:
-        priority = 3
-    return (
-        priority,
-        item['confidence'] if item['analyzed'] else 0,
-        -item['submitted_at'].timestamp(),
-    )
-
-
-def _nlp_queue(request):
-    """Return the filtered, paginated NLP review queue."""
-    queue_filter = request.GET.get('filter', 'attention')
-    if queue_filter not in dict(NLP_QUEUE_FILTERS):
-        queue_filter = 'attention'
-
-    items = []
-    for model, kind in ((Concern, 'concern'), (Confession, 'confession')):
-        queryset = (
-            model.objects
-            .select_related('category', 'nlp_suggested_category')
-            .order_by('-submitted_at')
-        )
-        items.extend(_nlp_report_item(report, kind) for report in queryset)
-
-    if queue_filter == 'attention':
-        items = [
-            item for item in items
-            if not item['analyzed'] or item['mismatch'] or item['low_confidence']
-        ]
-
-    items.sort(key=_nlp_queue_sort_key)
-    paginator = Paginator(items, 10)
-    page = paginator.get_page(request.GET.get('page', 1))
-    return page, queue_filter, paginator.count
-
-
-def _nlp_stats():
-    """Aggregate NLP coverage and quality metrics across all reports."""
-    total_concerns = Concern.objects.count()
-    total_confessions = Confession.objects.count()
-    total_reports = total_concerns + total_confessions
-
-    analyzed_concerns = Concern.objects.filter(nlp_analyzed_at__isnull=False)
-    analyzed_confessions = Confession.objects.filter(nlp_analyzed_at__isnull=False)
-    analyzed_count = analyzed_concerns.count() + analyzed_confessions.count()
-
-    mismatch_count = (
-        Concern.objects
-        .filter(nlp_suggested_category__isnull=False)
-        .exclude(nlp_suggested_category=F('category'))
-        .count()
-        + Confession.objects
-        .filter(nlp_suggested_category__isnull=False)
-        .exclude(nlp_suggested_category=F('category'))
-        .count()
-    )
-    low_confidence_count = (
-        analyzed_concerns.filter(nlp_confidence__lt=LOW_CONFIDENCE_THRESHOLD).count()
-        + analyzed_confessions.filter(nlp_confidence__lt=LOW_CONFIDENCE_THRESHOLD).count()
-    )
-
-    concern_average = analyzed_concerns.aggregate(value=Avg('nlp_confidence'))['value'] or 0
-    confession_average = analyzed_confessions.aggregate(value=Avg('nlp_confidence'))['value'] or 0
-    concern_analyzed = analyzed_concerns.count()
-    confession_analyzed = analyzed_confessions.count()
-    average_confidence = (
-        round(
-            (
-                concern_average * concern_analyzed
-                + confession_average * confession_analyzed
-            ) / analyzed_count
-        )
-        if analyzed_count else 0
-    )
-
-    return {
-        'total_reports': total_reports,
-        'analyzed_count': analyzed_count,
-        'unanalyzed_count': total_reports - analyzed_count,
-        'mismatch_count': mismatch_count,
-        'low_confidence_count': low_confidence_count,
-        'average_confidence': average_confidence,
-        'active_category_count': Category.objects.filter(is_active=True).count(),
-        'category_count': Category.objects.count(),
-    }
-
-
-def _nlp_category_coverage():
-    """Combine report counts and keyword details for every category."""
-    counts = {}
-    for model in (Concern, Confession):
-        for row in model.objects.values('category_id').annotate(total=Count('id')):
-            counts[row['category_id']] = counts.get(row['category_id'], 0) + row['total']
-
-    total = sum(counts.values())
-    categories = []
-    for category in Category.objects.all():
-        keywords = parse_keywords(category.keywords)
-        using_defaults = not keywords
-        if using_defaults:
-            keywords = default_keywords(category.name)
-        report_count = counts.get(category.id, 0)
-        categories.append({
-            'category': category,
-            'total': report_count,
-            'share': round(report_count / total * 100) if total else 0,
-            'keywords': keywords,
-            'keyword_count': len(keywords),
-            'using_defaults': using_defaults,
-        })
-
-    categories.sort(key=lambda item: (-item['total'], item['category'].name.lower()))
-    return categories
-
-
-def _nlp_workspace(request, template_name):
-    """Shared NLP categorization workspace for administrators."""
-    sample = None
-
-    if request.method == 'POST':
-        action = request.POST.get('action', '')
-
-        if action == 'analyze_sample':
-            sample_text = request.POST.get('sample_text', '').strip()
-            if not sample_text:
-                messages.error(request, 'Enter some text to analyze.')
-            else:
-                result = classify_text(sample_text)
-                sample = {
-                    'text': sample_text,
-                    'category': result.suggested_name,
-                    'confidence': result.confidence,
-                    'signals': result.signals,
-                    'scores': result.scores,
-                    'matched': result.matched,
-                }
-
-        else:
-            if action == 'analyze_report':
-                kind = request.POST.get('kind', '')
-                model = {
-                    'concern': Concern,
-                    'confession': Confession,
-                }.get(kind)
-                if model is None:
-                    messages.error(request, 'Unknown report type.')
-                else:
-                    report = get_object_or_404(model, pk=request.POST.get('pk'))
-                    result = _analyze_report_instance(report)
-                    messages.success(
-                        request,
-                        f'NLP analysis complete for "{report.title}": '
-                        f'{result.suggested_name} at {result.confidence}% confidence.',
-                    )
-
-            elif action == 'analyze_all':
-                categories = list(Category.objects.filter(is_active=True))
-                analyzed = 0
-                for model in (Concern, Confession):
-                    for report in model.objects.only(
-                        'id', 'description', 'nlp_suggested_category',
-                        'nlp_confidence', 'nlp_signals', 'nlp_analyzed_at',
-                    ).iterator():
-                        _analyze_report_instance(report, categories=categories)
-                        analyzed += 1
-                messages.success(
-                    request,
-                    f'Re-ran the NLP model on {analyzed} report'
-                    f'{"s" if analyzed != 1 else ""}.',
-                )
-
-            elif action == 'apply':
-                kind = request.POST.get('kind', '')
-                model = {
-                    'concern': Concern,
-                    'confession': Confession,
-                }.get(kind)
-                if model is None:
-                    messages.error(request, 'Unknown report type.')
-                else:
-                    report = get_object_or_404(model, pk=request.POST.get('pk'))
-                    suggestion = report.nlp_suggested_category
-                    if suggestion is None:
-                        messages.error(
-                            request,
-                            'No NLP suggestion is stored for this report. '
-                            'Re-run the analysis first.',
-                        )
-                    elif suggestion.pk == report.category_id:
-                        messages.info(
-                            request,
-                            f'"{report.title}" is already in the suggested category.',
-                        )
-                    else:
-                        old_category = report.category.name
-                        report.category = suggestion
-                        report.save(update_fields=['category', 'updated_at'])
-                        log_admin_activity(
-                            request.user,
-                            AdminAction.CATEGORY_CHANGED,
-                            report=report,
-                            old_value=old_category,
-                            new_value=suggestion.name,
-                            detail='Applied the NLP category suggestion.',
-                        )
-                        messages.success(
-                            request,
-                            f'"{report.title}" recategorized from '
-                            f'{old_category} to {suggestion.name}.',
-                        )
-
-            elif action == 'create_category':
-                name = ' '.join(request.POST.get('name', '').split())
-                raw_keywords = request.POST.get('keywords', '').strip()
-                description = request.POST.get('description', '').strip()
-
-                if not name:
-                    messages.error(request, 'Category name is required.')
-                elif Category.objects.filter(name__iexact=name).exists():
-                    messages.error(request, f'Category "{name}" already exists.')
-                else:
-                    category = Category.objects.create(
-                        name=name,
-                        description=description,
-                        keywords=', '.join(parse_keywords(raw_keywords)),
-                    )
-                    log_admin_activity(
-                        request.user,
-                        AdminAction.CATEGORY_CREATED,
-                        detail=f'Created the "{category.name}" category.',
-                    )
-                    messages.success(request, f'Category "{category.name}" created.')
-
-            elif action == 'update_category':
-                category = get_object_or_404(Category, pk=request.POST.get('category_id'))
-                name = ' '.join(request.POST.get('name', '').split())
-                raw_keywords = request.POST.get('keywords', '').strip()
-                description = request.POST.get('description', '').strip()
-
-                if not name:
-                    messages.error(request, 'Category name is required.')
-                elif (
-                    Category.objects
-                    .filter(name__iexact=name)
-                    .exclude(pk=category.pk)
-                    .exists()
-                ):
-                    messages.error(request, f'Category "{name}" already exists.')
-                else:
-                    category.name = name
-                    category.description = description
-                    category.keywords = ', '.join(parse_keywords(raw_keywords))
-                    category.is_active = request.POST.get('is_active') == 'on'
-                    category.save()
-                    log_admin_activity(
-                        request.user,
-                        AdminAction.CATEGORY_UPDATED,
-                        detail=f'Updated the "{category.name}" category.',
-                    )
-                    messages.success(
-                        request,
-                        f'Category "{category.name}" updated. '
-                        'Re-run the analysis to apply keyword changes to existing reports.',
-                    )
-
-            elif action == 'seed_defaults':
-                created = 0
-                for name, keywords in DEFAULT_CATEGORY_KEYWORDS.items():
-                    if Category.objects.filter(name__iexact=name).exists():
-                        continue
-                    Category.objects.create(
-                        name=name,
-                        description=default_description(name),
-                        keywords=', '.join(keywords),
-                    )
-                    created += 1
-                if created:
-                    log_admin_activity(
-                        request.user,
-                        AdminAction.CATEGORY_CREATED,
-                        detail=f'Seeded {created} default NLP categories.',
-                    )
-                    messages.success(
-                        request,
-                        f'Added {created} default categor'
-                        f'{"y" if created == 1 else "ies"}.',
-                    )
-                else:
-                    messages.info(request, 'All default categories already exist.')
-
-            else:
-                messages.error(request, 'Unknown NLP action.')
-
-            anchor = 'categories' if action in {
-                'create_category', 'update_category', 'seed_defaults',
-            } else 'review'
-            return redirect(f'{request.path}#{anchor}')
-
-    queue, queue_filter, queue_total = _nlp_queue(request)
-    context = {
-        **_nlp_stats(),
-        'queue': queue,
-        'queue_filter': queue_filter,
-        'queue_total': queue_total,
-        'queue_filters': NLP_QUEUE_FILTERS,
-        'categories': _nlp_category_coverage(),
-        'low_confidence_threshold': LOW_CONFIDENCE_THRESHOLD,
-        'sample': sample,
-    }
-    return render(request, template_name, context)
-
-
-@login_required(login_url='login')
-@user_passes_test(_is_team_member, login_url='dashboard')
-@require_http_methods(['GET', 'POST'])
-def nlp_hub(request):
-    """Dedicated administrator hub for reviewing and tuning NLP categorizations."""
-    return _nlp_workspace(request, 'nlp_hub.html')
 
 
 @login_required(login_url='login')
@@ -1400,7 +1045,7 @@ def admin_report_detail(request, kind, pk):
         'response': getattr(report, 'response', None),
         'notes': report.notes.select_related('author') if kind == 'concern' else ConcernNote.objects.none(),
         'activity_logs': report.activity_logs.select_related('actor')[:10],
-        'back_url': reverse('team_dashboard'),
+        'back_url': reverse('admin_dashboard'),
         'can_view_activity_history': _is_team_member(request.user),
     }
     return render(request, 'admin_report_detail.html', context)
@@ -1566,9 +1211,8 @@ def admin_activity_history(request):
     return render(request, 'admin_activity_history.html', context)
 
 
-@login_required(login_url='login')
 def home(request):
-    """Dashboard with personal progress plus the latest anonymous submissions."""
+    """Public feed plus personal progress for signed-in users."""
     concerns = Concern.objects.all()
     confessions = Confession.objects.all()
 
@@ -1586,24 +1230,31 @@ def home(request):
         item['comments'] = comments
         item['comment_count'] = len(comments)
 
-    # Personal, linked-report summary.
-    my_concerns = Concern.objects.filter(submitted_by=request.user)
-    my_confessions = Confession.objects.filter(submitted_by=request.user)
-    closed_statuses = [ConcernStatus.RESOLVED, ConcernStatus.DISMISSED]
-    my_total = my_concerns.count() + my_confessions.count()
-    my_open = (
-        my_concerns.exclude(status__in=closed_statuses).count()
-        + my_confessions.exclude(status__in=closed_statuses).count()
-    )
-    my_resolved = (
-        my_concerns.filter(status=ConcernStatus.RESOLVED).count()
-        + my_confessions.filter(status=ConcernStatus.RESOLVED).count()
-    )
-    my_responses = (
-        my_concerns.filter(response__isnull=False).count()
-        + my_confessions.filter(response__isnull=False).count()
-    )
-    my_resolution_rate = round(my_resolved / my_total * 100) if my_total else 0
+    # Personal, linked-report summary (signed-in users only).
+    if request.user.is_authenticated:
+        my_concerns = Concern.objects.filter(submitted_by=request.user)
+        my_confessions = Confession.objects.filter(submitted_by=request.user)
+        closed_statuses = [ConcernStatus.RESOLVED, ConcernStatus.DISMISSED]
+        my_total = my_concerns.count() + my_confessions.count()
+        my_open = (
+            my_concerns.exclude(status__in=closed_statuses).count()
+            + my_confessions.exclude(status__in=closed_statuses).count()
+        )
+        my_resolved = (
+            my_concerns.filter(status=ConcernStatus.RESOLVED).count()
+            + my_confessions.filter(status=ConcernStatus.RESOLVED).count()
+        )
+        my_responses = (
+            my_concerns.filter(response__isnull=False).count()
+            + my_confessions.filter(response__isnull=False).count()
+        )
+        my_resolution_rate = round(my_resolved / my_total * 100) if my_total else 0
+        my_recent_reports = _user_report_cards(request.user, 5)
+    else:
+        closed_statuses = [ConcernStatus.RESOLVED, ConcernStatus.DISMISSED]
+        my_total = my_open = my_resolved = my_responses = 0
+        my_resolution_rate = 0
+        my_recent_reports = []
 
     # Community-wide pulse used by the progress ring and status bars.
     community_total = concerns.count() + confessions.count()
@@ -1628,7 +1279,7 @@ def home(request):
         'my_resolved': my_resolved,
         'my_responses': my_responses,
         'my_resolution_rate': my_resolution_rate,
-        'my_recent_reports': _user_report_cards(request.user, 5),
+        'my_recent_reports': my_recent_reports,
         'community_total': community_total,
         'community_open': community_open,
         'community_resolved': community_resolved,
@@ -1665,6 +1316,7 @@ def add_comment(request, kind, pk):
     ReportComment.objects.create(
         author=request.user,
         body=body,
+        poster_codename=user_codename(request.user.pk),
         **parent,
     )
 

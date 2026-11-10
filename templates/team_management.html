@@ -1,9 +1,7 @@
 {% extends "theme/sage_page_base.html" %}
 
 {% block page_eyebrow %}
-<a href="{% url 'team_dashboard' %}" class="text-decoration-none" style="color: inherit;">
-  <i class="fas fa-arrow-left" aria-hidden="true"></i>Back to Team Dashboard
-</a>
+<i class="fas fa-shield-halved" aria-hidden="true"></i>Administrator tools
 {% endblock %}
 {% block page_title %}Team <em>tools</em>{% endblock %}
 {% block page_subtitle %}Reports and management tools for SafeSpeak administrators.{% endblock %}
@@ -44,7 +42,7 @@
     <div class="sd-kpi-body">
       <span class="sd-kpi-label">Accounts</span>
       <strong class="sd-kpi-value">{{ user_count }}</strong>
-      <span class="sd-kpi-meta">{{ nlp_category_count }} active categor{{ nlp_category_count|pluralize:"y,ies" }}</span>
+      <span class="sd-kpi-meta">Registered SafeSpeak accounts</span>
     </div>
   </article>
 </section>
@@ -63,16 +61,16 @@
     </div>
   </a>
 
-  <a href="{% url 'nlp_hub' %}" class="sd-management-card is-teal">
+  <a href="{% url 'admin:core_category_changelist' %}" class="sd-management-card is-teal">
     <div class="sd-management-top">
-      <span class="sd-management-icon"><i class="fas fa-brain" aria-hidden="true"></i></span>
-      <span class="sd-badge is-info">{{ nlp_category_count }} categor{{ nlp_category_count|pluralize:"y,ies" }}</span>
+      <span class="sd-management-icon"><i class="fas fa-tags" aria-hidden="true"></i></span>
+      <span class="sd-badge is-info">{{ category_count }} categor{{ category_count|pluralize:"y,ies" }}</span>
     </div>
-    <h2>NLP categorization hub</h2>
-    <p>Review model confidence, apply suggested categories, and tune the keyword library.</p>
+    <h2>Categories</h2>
+    <p>Add, rename, and deactivate the categories students choose from when submitting a report.</p>
     <div class="sd-management-foot">
-      <span>Machine-assisted triage</span>
-      <strong>Review <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
+      <span>Category library</span>
+      <strong>Manage <i class="fas fa-arrow-right" aria-hidden="true"></i></strong>
     </div>
   </a>
 

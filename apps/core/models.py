@@ -17,13 +17,6 @@ class Category(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    keywords = models.TextField(
-        blank=True,
-        help_text=(
-            'Comma-separated words or phrases used by the NLP classifier. '
-            'End a word with * to match its beginning (for example, harass*).'
-        ),
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -31,6 +24,25 @@ class Category(models.Model):
         db_table = 'safespeak_category'
         ordering = ['name']
         verbose_name_plural = 'categories'
+
+    def __str__(self):
+        return self.name
+
+
+class UserCodeName(models.Model):
+    """A custom community code name chosen by a user."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='code_name',
+    )
+    name = models.CharField(max_length=50, unique=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'safespeak_user_code_name'
+        ordering = ['name']
 
     def __str__(self):
         return self.name
@@ -75,16 +87,6 @@ class Concern(models.Model):
         related_name='filed_concerns',
     )
     poster_codename = models.CharField(max_length=50, blank=True, editable=False)
-    nlp_suggested_category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='suggested_concerns',
-    )
-    nlp_confidence = models.FloatField(default=0)
-    nlp_signals = models.CharField(max_length=255, blank=True)
-    nlp_analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'safespeak_concern'
@@ -216,16 +218,6 @@ class Confession(models.Model):
         related_name='filed_confessions',
     )
     poster_codename = models.CharField(max_length=50, blank=True, editable=False)
-    nlp_suggested_category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='suggested_confessions',
-    )
-    nlp_confidence = models.FloatField(default=0)
-    nlp_signals = models.CharField(max_length=255, blank=True)
-    nlp_analyzed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'safespeak_confession'
@@ -437,6 +429,7 @@ class ReportComment(models.Model):
     body = models.TextField(max_length=1000)
     is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    poster_codename = models.CharField(max_length=50, blank=True, editable=False)
 
     class Meta:
         db_table = 'safespeak_report_comment'
@@ -460,6 +453,8 @@ class ReportComment(models.Model):
     @property
     def codename(self):
         """Return the public code name shown instead of an identity."""
+        if self.poster_codename:
+            return self.poster_codename
         if self.author_id:
             return user_codename(self.author_id)
         if self.pk is None:

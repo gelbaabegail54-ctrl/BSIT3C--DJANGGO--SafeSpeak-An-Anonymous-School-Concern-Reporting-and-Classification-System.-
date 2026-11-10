@@ -10,7 +10,7 @@ Traditional reporting methods, such as physical suggestion boxes and face-to-fac
 
 To address these challenges, **SafeSpeak: An Anonymous School Concern Reporting and Classification System** is proposed as a web-based platform that provides students with an accessible and confidential channel for reporting school-related concerns.
 
-The system will utilize Natural Language Processing (NLP) to analyze submitted reports, identify their categories, and assess their urgency levels. Classified reports will be organized through an administrative dashboard, allowing authorized school personnel, such as guidance counselors and administrators, to review, prioritize, assign, and manage reported concerns more efficiently.
+The system will let students choose a concern category when they submit a report and flag reports that need urgent attention. Categorized reports will be organized through an administrative dashboard, allowing authorized school personnel, such as guidance counselors and administrators, to review, prioritize, assign, and manage reported concerns more efficiently.
 
 Through this approach, SafeSpeak aims to encourage responsible reporting, improve incident management, and support a safer and more responsive school environment.
 
@@ -22,19 +22,19 @@ Educational institutions face challenges in addressing student concerns, includi
 
 Additionally, traditional manual reporting processes can make it difficult for school personnel to organize, classify, and prioritize incoming concerns. This may result in delays in identifying urgent cases and providing appropriate interventions.
 
-To address these challenges, the project aims to design, develop, and evaluate **SafeSpeak: An Anonymous School Concern Reporting and Classification System** to streamline concern reporting, automate report classification, and improve administrative case management.
+To address these challenges, the project aims to design, develop, and evaluate **SafeSpeak: An Anonymous School Concern Reporting and Classification System** to streamline concern reporting, organize reports by category, and improve administrative case management.
 
 ### General Objective
 
-To develop a web-based anonymous school concern reporting and classification system that utilizes Natural Language Processing (NLP) to categorize submitted concerns and identify their urgency levels.
+To develop a web-based anonymous school concern reporting and classification system that lets students categorize submitted concerns and flag urgent reports for administrative review.
 
 ### Specific Objectives
 
 1. Develop a web-based reporting portal that allows students to submit school-related concerns anonymously.
-2. Implement a Natural Language Processing (NLP) engine that analyzes submitted reports, identifies concern categories, and determines severity levels.
+2. Implement a structured category library that lets students classify their reports and allows administrators to adjust categories during review.
 3. Integrate an administrative dashboard that displays incoming reports, provides urgency notifications, and supports efficient case management.
 4. Establish role-based access control and secure audit logs to maintain data confidentiality and restrict unauthorized access.
-5. Conduct User Acceptance Testing (UAT) with selected students and school personnel to evaluate usability, classification accuracy, and system performance.
+5. Conduct User Acceptance Testing (UAT) with selected students and school personnel to evaluate usability, report organization, and system performance.
 
 ---
 
@@ -46,13 +46,13 @@ SafeSpeak is expected to provide practical benefits to the following stakeholder
 Provides students with an accessible and confidential platform where they can report bullying, harassment, mental health concerns, and safety-related incidents without publicly disclosing their identities.
 
 ### Guidance Counselors and Administrators
-Helps authorized school personnel organize, classify, and prioritize submitted concerns. The system's classification and urgency assessment features can assist staff in identifying reports that may require immediate attention.
+Helps authorized school personnel organize, classify, and prioritize submitted concerns. The system's category organization and urgency flag features can assist staff in identifying reports that may require immediate attention.
 
 ### School Leadership
 Provides organized and anonymized reporting information that can help school leaders identify recurring concerns, recognize campus safety trends, and develop appropriate student welfare programs and institutional policies.
 
 ### Future Researchers and Developers
-Serves as a reference for future studies and system development involving anonymous reporting platforms, Natural Language Processing, automated text classification, and school information systems.
+Serves as a reference for future studies and system development involving anonymous reporting platforms, structured report categorization, and school information systems.
 
 ---
 
@@ -60,7 +60,7 @@ Serves as a reference for future studies and system development involving anonym
 
 ### Institutional Research Agenda Alignment
 
-SafeSpeak aligns with the institutional research priorities in **Information and Communications Technology (ICT), Campus Governance, and Student Welfare**. It applies web-based technologies and Natural Language Processing to modernize school concern reporting, improve incident classification, and support data-informed administrative decision-making.
+SafeSpeak aligns with the institutional research priorities in **Information and Communications Technology (ICT), Campus Governance, and Student Welfare**. It applies web-based technologies to modernize school concern reporting, improve report organization, and support data-informed administrative decision-making.
 
 ### Sustainable Development Goals (SDGs)
 
@@ -91,7 +91,7 @@ SafeSpeak will be developed as a web-based application intended for deployment w
 **2. School Administrators and Guidance Counselors**
 - Access the system through authenticated accounts.
 - View and review submitted reports.
-- Receive automatically classified reports and urgency assessments.
+- Review reports organized by category and urgency flags.
 - Monitor incoming and pending concerns through an administrative dashboard.
 - Assign reports to designated personnel.
 - Update case statuses and document actions taken.
@@ -102,9 +102,9 @@ SafeSpeak will be developed as a web-based application intended for deployment w
 | Module | Description |
 |---|---|
 | Anonymous Report Submission | Allows students to submit concerns without providing personal identity information. |
-| NLP Classification Engine | Analyzes report content and automatically identifies the appropriate concern category. |
-| Urgency Assessment Engine | Evaluates report content and assigns an estimated urgency level to assist in prioritization. |
-| Administrative Dashboard | Displays submitted reports, classifications, urgency levels, and case statistics. |
+| Category Selection | Lets students choose the concern category when submitting a report. |
+| Urgency Flag | Lets reporters mark a report as urgent so administrators can prioritize it. |
+| Administrative Dashboard | Displays submitted reports, categories, urgency flags, and case statistics. |
 | Case Management | Allows authorized personnel to review, assign, manage, and update reported concerns. |
 | Status Tracking | Enables students to monitor their submitted reports using a unique tracking code. |
 | Role-Based Access Control | Restricts system access and available functions according to assigned user roles. |
@@ -119,8 +119,7 @@ The proposed system will utilize the following technologies:
 | Frontend | HTML5, CSS3, JavaScript, Bootstrap |
 | Backend | Python (FastAPI or Flask) |
 | Database | PostgreSQL or MongoDB |
-| NLP Processing | Python, NLTK, Scikit-learn |
-| Classification | Machine Learning and Natural Language Processing |
+| Categorization | Student-selected categories with administrator review |
 | Development Environment | Visual Studio Code |
 | Version Control | Git and GitHub |
 
@@ -132,7 +131,7 @@ The following limitations define the boundaries of the current development phase
 
 1. **Anonymous Reporting:** The system is designed to avoid requiring students to disclose their identities. However, absolute anonymity cannot be guaranteed if identifying information is voluntarily included in report descriptions or uploaded attachments.
 
-2. **NLP Classification Accuracy:** Automated classification and urgency assessment may not always correctly interpret the context, tone, or meaning of submitted reports. Human review by authorized school personnel will remain necessary.
+2. **Category Accuracy:** Student-selected categories and urgency flags may not always reflect the full context, tone, or meaning of submitted reports. Human review by authorized school personnel will remain necessary.
 
 3. **Internet and Hosting Requirements:** The system will operate as a web-based application hosted on the school's local network or an approved cloud server. Access will depend on the availability of the hosting environment and network connectivity.
 
@@ -142,7 +141,7 @@ The following limitations define the boundaries of the current development phase
 
 6. **Data and Access Restrictions:** Submitted reports and supporting attachments will only be accessible to authorized personnel according to their assigned permissions.
 
-7. **Future Enhancements:** Additional integrations, advanced NLP capabilities, and mobile application support may be considered in future development phases.
+7. **Future Enhancements:** Additional integrations, richer reporting analytics, and mobile application support may be considered in future development phases.
 
 ---
 
@@ -162,4 +161,4 @@ This project is developed for academic purposes. Licensing and distribution term
 
 ## Disclaimer
 
-SafeSpeak is intended to support school concern reporting and administrative case management. It is not a substitute for professional mental health services, counseling, emergency response, or formal school investigation procedures. Automated classifications and urgency assessments should be treated as decision-support information and must be reviewed by authorized school personnel.
+SafeSpeak is intended to support school concern reporting and administrative case management. It is not a substitute for professional mental health services, counseling, emergency response, or formal school investigation procedures. Report categories and urgency flags should be treated as decision-support information and must be reviewed by authorized school personnel.

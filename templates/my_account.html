@@ -2,7 +2,7 @@
 
 {% block page_eyebrow %}<i class="fas fa-user-gear" aria-hidden="true"></i>Account{% endblock %}
 {% block page_title %}My <em>account</em>{% endblock %}
-{% block page_subtitle %}Manage your profile, password, and the reports you chose to link to your account.{% endblock %}
+{% block page_subtitle %}Manage your profile, community code name, password, and the reports you chose to link to your account.{% endblock %}
 
 {% block page_actions %}
 <span class="sd-badge"><i class="fas fa-user-shield" aria-hidden="true"></i>{{ role_label }}</span>
@@ -109,6 +109,58 @@
           </button>
         </div>
       </form>
+    </section>
+
+    <section class="sd-form-card" aria-labelledby="code-name-title" style="margin-top: 16px;">
+      <div class="sd-form-card-head">
+        <span class="sd-report-kind"><i class="fas fa-user-secret" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="sd-form-card-title" id="code-name-title">Community code name</h2>
+          <p class="sd-form-card-sub">This is the public name other students see on your reports and comments. Never use your real name or other identifying details.</p>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'my_account' %}" class="sd-form-section">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="codename">
+
+        <label class="form-label" for="id_codename">Code name</label>
+        <input
+          type="text"
+          class="form-control{% if codename_form.codename.errors %} is-invalid{% endif %}"
+          id="id_codename"
+          name="codename"
+          maxlength="50"
+          value="{{ codename_form.codename.value|default:'' }}"
+          placeholder="{{ generated_codename }}"
+          autocomplete="off"
+          required
+        >
+        {% for error in codename_form.codename.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+        {% endfor %}
+        <div class="form-text">3&ndash;50 characters. Use letters, numbers, spaces, periods, hyphens, or underscores.</div>
+
+        <div class="sd-form-actions">
+          <span class="sd-badge is-muted"><i class="fas fa-eye" aria-hidden="true"></i>Public name: {{ current_codename }}</span>
+          <button type="submit" class="sd-btn sd-btn-primary">
+            <i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save code name</span>
+          </button>
+        </div>
+      </form>
+
+      {% if has_custom_codename %}
+      <form method="post" action="{% url 'my_account' %}" class="sd-form-section">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reset_codename">
+        <div class="sd-form-actions">
+          <span class="form-text" style="margin: 0;">Or return to the generated name, <strong>{{ generated_codename }}</strong>.</span>
+          <button type="submit" class="sd-btn sd-btn-soft">
+            <i class="fas fa-rotate-left" aria-hidden="true"></i><span>Use generated name</span>
+          </button>
+        </div>
+      </form>
+      {% endif %}
     </section>
 
     <section class="sd-form-card" aria-labelledby="change-password-title" style="margin-top: 16px;">
